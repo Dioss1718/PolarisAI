@@ -1,0 +1,13 @@
+{
+  "resources": [
+    {"id": "vm1", "type": "VM"},
+    {"id": "db1", "type": "DATABASE"},
+    {"id": "iam_admin", "type": "IAM_ROLE"},
+    {"id": "internet", "type": "INTERNET"}
+  ],
+  "connections": [
+    {"from": "internet", "to": "vm1", "type": "EXPOSES"},
+    {"from": "vm1", "to": "iam_admin", "type": "ASSUMES_ROLE"},
+    {"from": "iam_admin", "to": "db1", "type": "ACCESS"}
+  ]
+}
