@@ -12,7 +12,9 @@
       "utilization": 20,
       "exposure": "PUBLIC",
       "criticality": 9,
-      "compliance_flags": ["IAM_OVERPRIVILEGED"]
+      "compliance_flags": ["IAM_OVERPRIVILEGED"],
+      "encryption_at_rest": false,
+      "backup_enabled": false
     },
     {
       "id": "aws_iam1",
@@ -26,7 +28,9 @@
       "utilization": 95,
       "exposure": "INTERNAL",
       "criticality": 10,
-      "compliance_flags": ["ADMIN_ACCESS"]
+      "compliance_flags": ["ADMIN_ACCESS"],
+      "encryption_at_rest": false,
+      "backup_enabled": false
     },
     {
       "id": "aws_db1",
@@ -40,7 +44,9 @@
       "utilization": 75,
       "exposure": "PRIVATE",
       "criticality": 10,
-      "compliance_flags": []
+      "compliance_flags": [],
+      "encryption_at_rest": false,
+      "backup_enabled": false
     },
     {
       "id": "azure_vm1",
@@ -54,7 +60,9 @@
       "utilization": 15,
       "exposure": "PUBLIC",
       "criticality": 8,
-      "compliance_flags": ["OPEN_PORT"]
+      "compliance_flags": ["OPEN_PORT"],
+      "encryption_at_rest": false,
+      "backup_enabled": false
     },
     {
       "id": "azure_storage1",
@@ -68,7 +76,9 @@
       "utilization": 12,
       "exposure": "PUBLIC",
       "criticality": 6,
-      "compliance_flags": ["PUBLIC_BUCKET"]
+      "compliance_flags": ["PUBLIC_BUCKET"],
+      "encryption_at_rest": false,
+      "backup_enabled": false
     },
     {
       "id": "gcp_lb1",
@@ -82,7 +92,9 @@
       "utilization": 65,
       "exposure": "PUBLIC",
       "criticality": 7,
-      "compliance_flags": []
+      "compliance_flags": [],
+      "encryption_at_rest": true,
+      "backup_enabled": true
     },
     {
       "id": "gcp_storage1",
@@ -96,7 +108,9 @@
       "utilization": 20,
       "exposure": "PRIVATE",
       "criticality": 7,
-      "compliance_flags": []
+      "compliance_flags": [],
+      "encryption_at_rest": true,
+      "backup_enabled": true
     },
     {
       "id": "sg1",
@@ -110,10 +124,11 @@
       "utilization": 0,
       "exposure": "PUBLIC",
       "criticality": 8,
-      "compliance_flags": ["PORT_0_0_0_0"]
+      "compliance_flags": ["PORT_0_0_0_0"],
+      "encryption_at_rest": false,
+      "backup_enabled": false
     }
   ],
-
   "edges": [
     {
       "from": "gcp_lb1",
