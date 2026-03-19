@@ -24,10 +24,8 @@
       "exposure": "PUBLIC",
       "criticality": 9,
       "compliance_flags": ["IAM_OVERPRIVILEGED"],
-<<<<<<< HEAD
       "encryption_at_rest": false,
-      "backup_enabled": false
-=======
+      "backup_enabled": false,
 
       "metrics": {
         "cpu_usage_trend": "LOW",
@@ -35,10 +33,9 @@
       },
 
       "activity_logs": [
-        "Multiple inbound connections from unknown IP",
-        "High outbound traffic detected"
+        "High inbound traffic detected",
+        "Unusual outbound data flow"
       ]
->>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     },
 
     {
@@ -55,21 +52,13 @@
       "exposure": "INTERNAL",
       "criticality": 10,
       "compliance_flags": ["ADMIN_ACCESS"],
-<<<<<<< HEAD
-      "encryption_at_rest": false,
-      "backup_enabled": false
-=======
 
-      "iam_policies": [
-        "FullAccessPolicy",
-        "S3ReadWrite"
-      ],
+      "iam_policies": ["FullAccess", "S3ReadWrite"],
 
       "activity_logs": [
-        "Role assumed by vm1",
-        "Privilege escalation detected"
+        "Admin privileges used",
+        "Sensitive resource accessed"
       ]
->>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     },
 
     {
@@ -85,7 +74,9 @@
       "utilization": 40,
       "exposure": "INTERNAL",
       "criticality": 5,
-      "compliance_flags": []
+      "compliance_flags": [],
+
+      "iam_policies": ["ReadOnlyAccess"]
     },
 
     {
@@ -102,16 +93,13 @@
       "exposure": "PRIVATE",
       "criticality": 10,
       "compliance_flags": [],
-<<<<<<< HEAD
       "encryption_at_rest": false,
-      "backup_enabled": false
-=======
+      "backup_enabled": false,
 
       "activity_logs": [
         "Sensitive query executed",
         "Connection from IAM role"
       ]
->>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     },
 
     {
@@ -128,10 +116,15 @@
       "exposure": "PUBLIC",
       "criticality": 8,
       "compliance_flags": ["OPEN_PORT"],
-<<<<<<< HEAD
       "encryption_at_rest": false,
-      "backup_enabled": false
+      "backup_enabled": false,
+
+      "metrics": {
+        "cpu_usage_trend": "IDLE",
+        "network_traffic": "LOW"
+      }
     },
+
     {
       "id": "azure_storage1",
       "type": "OBJECT_STORAGE",
@@ -141,19 +134,13 @@
       "account_id": "azure-prod-01",
       "environment": "DEV",
       "cost": 40,
+      "cost_model": "ON_DEMAND",
       "utilization": 12,
       "exposure": "PUBLIC",
       "criticality": 6,
       "compliance_flags": ["PUBLIC_BUCKET"],
       "encryption_at_rest": false,
       "backup_enabled": false
-=======
-
-      "metrics": {
-        "cpu_usage_trend": "IDLE",
-        "network_traffic": "LOW"
-      }
->>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     },
 
     {
@@ -173,16 +160,17 @@
       "encryption_at_rest": true,
       "backup_enabled": true
     },
-<<<<<<< HEAD
+
     {
       "id": "gcp_storage1",
       "type": "OBJECT_STORAGE",
-      "name": "GCP Cloud Storage",
+      "name": "GCP Storage",
       "cloud_provider": "GCP",
       "region": "asia-south1",
       "account_id": "gcp-prod-01",
       "environment": "PROD",
       "cost": 35,
+      "cost_model": "ON_DEMAND",
       "utilization": 20,
       "exposure": "PRIVATE",
       "criticality": 7,
@@ -190,9 +178,7 @@
       "encryption_at_rest": true,
       "backup_enabled": true
     },
-=======
 
->>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     {
       "id": "sg1",
       "type": "SECURITY_GROUP",
@@ -206,11 +192,10 @@
       "utilization": 0,
       "exposure": "PUBLIC",
       "criticality": 8,
-      "compliance_flags": ["PORT_0_0_0_0"],
-      "encryption_at_rest": false,
-      "backup_enabled": false
+      "compliance_flags": ["PORT_0_0_0_0"]
     }
   ],
+
   "edges": [
     {
       "from": "gcp_lb1",
@@ -235,6 +220,18 @@
       "to": "aws_db1",
       "type": "ACCESS",
       "weight": 5
+    },
+    {
+      "from": "aws_vm1",
+      "to": "azure_storage1",
+      "type": "DEPENDS_ON",
+      "weight": 2
+    },
+    {
+      "from": "azure_vm1",
+      "to": "gcp_storage1",
+      "type": "DEPENDS_ON",
+      "weight": 2
     },
     {
       "from": "sg1",
