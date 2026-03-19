@@ -1,4 +1,14 @@
 {
+  "compliance_rules": ["SOC2", "ISO27001", "PCI-DSS"],
+
+  "state_vector": {
+    "R_t": "resource_config_state",
+    "C_t": "cost_metrics",
+    "N_t": "network_topology",
+    "I_t": "iam_graph",
+    "L_t": "log_signals"
+  },
+
   "nodes": [
     {
       "id": "aws_vm1",
@@ -9,15 +19,30 @@
       "account_id": "aws-prod-001",
       "environment": "PROD",
       "cost": 150,
+      "cost_model": "ON_DEMAND",
       "utilization": 20,
       "exposure": "PUBLIC",
       "criticality": 9,
       "compliance_flags": ["IAM_OVERPRIVILEGED"],
+<<<<<<< HEAD
       "encryption_at_rest": false,
       "backup_enabled": false
+=======
+
+      "metrics": {
+        "cpu_usage_trend": "LOW",
+        "network_traffic": "HIGH"
+      },
+
+      "activity_logs": [
+        "Multiple inbound connections from unknown IP",
+        "High outbound traffic detected"
+      ]
+>>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     },
+
     {
-      "id": "aws_iam1",
+      "id": "aws_iam_admin",
       "type": "IAM_ROLE",
       "name": "AWS Admin Role",
       "cloud_provider": "AWS",
@@ -25,13 +50,44 @@
       "account_id": "aws-prod-001",
       "environment": "PROD",
       "cost": 0,
+      "cost_model": "N/A",
       "utilization": 95,
       "exposure": "INTERNAL",
       "criticality": 10,
       "compliance_flags": ["ADMIN_ACCESS"],
+<<<<<<< HEAD
       "encryption_at_rest": false,
       "backup_enabled": false
+=======
+
+      "iam_policies": [
+        "FullAccessPolicy",
+        "S3ReadWrite"
+      ],
+
+      "activity_logs": [
+        "Role assumed by vm1",
+        "Privilege escalation detected"
+      ]
+>>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     },
+
+    {
+      "id": "aws_iam_readonly",
+      "type": "IAM_ROLE",
+      "name": "ReadOnly Role",
+      "cloud_provider": "AWS",
+      "region": "global",
+      "account_id": "aws-prod-001",
+      "environment": "DEV",
+      "cost": 0,
+      "cost_model": "N/A",
+      "utilization": 40,
+      "exposure": "INTERNAL",
+      "criticality": 5,
+      "compliance_flags": []
+    },
+
     {
       "id": "aws_db1",
       "type": "DATABASE",
@@ -41,13 +97,23 @@
       "account_id": "aws-prod-001",
       "environment": "PROD",
       "cost": 220,
+      "cost_model": "RESERVED",
       "utilization": 75,
       "exposure": "PRIVATE",
       "criticality": 10,
       "compliance_flags": [],
+<<<<<<< HEAD
       "encryption_at_rest": false,
       "backup_enabled": false
+=======
+
+      "activity_logs": [
+        "Sensitive query executed",
+        "Connection from IAM role"
+      ]
+>>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     },
+
     {
       "id": "azure_vm1",
       "type": "COMPUTE",
@@ -57,10 +123,12 @@
       "account_id": "azure-prod-01",
       "environment": "PROD",
       "cost": 130,
+      "cost_model": "ON_DEMAND",
       "utilization": 15,
       "exposure": "PUBLIC",
       "criticality": 8,
       "compliance_flags": ["OPEN_PORT"],
+<<<<<<< HEAD
       "encryption_at_rest": false,
       "backup_enabled": false
     },
@@ -79,7 +147,15 @@
       "compliance_flags": ["PUBLIC_BUCKET"],
       "encryption_at_rest": false,
       "backup_enabled": false
+=======
+
+      "metrics": {
+        "cpu_usage_trend": "IDLE",
+        "network_traffic": "LOW"
+      }
+>>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     },
+
     {
       "id": "gcp_lb1",
       "type": "LOAD_BALANCER",
@@ -89,6 +165,7 @@
       "account_id": "gcp-prod-01",
       "environment": "PROD",
       "cost": 60,
+      "cost_model": "ON_DEMAND",
       "utilization": 65,
       "exposure": "PUBLIC",
       "criticality": 7,
@@ -96,6 +173,7 @@
       "encryption_at_rest": true,
       "backup_enabled": true
     },
+<<<<<<< HEAD
     {
       "id": "gcp_storage1",
       "type": "OBJECT_STORAGE",
@@ -112,6 +190,9 @@
       "encryption_at_rest": true,
       "backup_enabled": true
     },
+=======
+
+>>>>>>> 30f3a3f (Added multi-cloud dataset with cross-cloud relationships)
     {
       "id": "sg1",
       "type": "SECURITY_GROUP",
@@ -121,6 +202,7 @@
       "account_id": "aws-prod-001",
       "environment": "PROD",
       "cost": 0,
+      "cost_model": "N/A",
       "utilization": 0,
       "exposure": "PUBLIC",
       "criticality": 8,
@@ -138,27 +220,21 @@
     },
     {
       "from": "aws_vm1",
-      "to": "aws_iam1",
+      "to": "aws_iam_readonly",
       "type": "ASSUMES_ROLE",
-      "weight": 3
+      "weight": 2
     },
     {
-      "from": "aws_iam1",
-      "to": "aws_db1",
-      "type": "ACCESS",
+      "from": "aws_iam_readonly",
+      "to": "aws_iam_admin",
+      "type": "PRIVILEGE_ESCALATION",
       "weight": 4
     },
     {
-      "from": "aws_vm1",
-      "to": "azure_storage1",
-      "type": "DEPENDS_ON",
-      "weight": 2
-    },
-    {
-      "from": "azure_vm1",
-      "to": "gcp_storage1",
-      "type": "DEPENDS_ON",
-      "weight": 2
+      "from": "aws_iam_admin",
+      "to": "aws_db1",
+      "type": "ACCESS",
+      "weight": 5
     },
     {
       "from": "sg1",
@@ -166,5 +242,20 @@
       "type": "EXPOSES",
       "weight": 3
     }
-  ]
+  ],
+
+  "logs": {
+    "api_logs": [
+      "CreateInstance API called",
+      "DeleteBucket API attempt failed"
+    ],
+    "iam_logs": [
+      "Role escalation detected",
+      "Policy attached to admin role"
+    ],
+    "cost_logs": [
+      "Unexpected cost spike in AWS",
+      "Idle resource detected in Azure"
+    ]
+  }
 }
