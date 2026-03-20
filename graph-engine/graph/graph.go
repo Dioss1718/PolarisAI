@@ -1,6 +1,6 @@
 package graph
 
-import "github.com/diya-suryawanshi/graph-engine/models"
+import "github.com/diya-suryawanshi/cloud/graph-engine/models"
 
 type Graph struct {
 	Nodes map[string]models.Node

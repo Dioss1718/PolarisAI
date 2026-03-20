@@ -1,8 +1,8 @@
 package builder
 
 import (
-	"github.com/diya-suryawanshi/graph-engine/graph"
-	"github.com/diya-suryawanshi/graph-engine/models"
+	"github.com/diya-suryawanshi/cloud/graph-engine/graph"
+	"github.com/diya-suryawanshi/cloud/graph-engine/models"
 )
 
 func BuildGraph(data map[string]interface{}) *graph.Graph {
