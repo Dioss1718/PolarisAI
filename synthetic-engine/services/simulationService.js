@@ -8,6 +8,11 @@ const applyRiskMutation = require("../mutators/riskMutator");
 const injectAttackPath = require("../mutators/attackMutator");
 const simulateTrafficSpike = require("../mutators/trafficMutator");
 
+// NEW IMPORTS
+const mutateTopology = require("../mutators/topologyMutator");
+const mutateExposure = require("../mutators/exposureMutator");
+const mutateIAM = require("../mutators/iamMutator");
+
 const datasetPath = path.join(__dirname, "../../Data/cloud_env.json");
 
 function runSimulation() {
@@ -16,13 +21,28 @@ function runSimulation() {
 
     let data = deepClone(rawData);
 
-    // Add timestamp 
     data.timestamp = new Date().toISOString();
 
-    // Apply mutations
+    data.logs = data.logs || {};
+    data.logs.api_logs = data.logs.api_logs || [];
+
+    // ------------------------
+    // CORE MUTATIONS
+    // ------------------------
     data = applyCostMutation(data);
     data = applyRiskMutation(data);
     data = simulateTrafficSpike(data);
+
+    // ------------------------
+    // NEW ADVANCED MUTATIONS
+    // ------------------------
+    data = mutateTopology(data);
+    data = mutateExposure(data);
+    data = mutateIAM(data);
+
+    // ------------------------
+    // ATTACK INJECTION
+    // ------------------------
     data = injectAttackPath(data);
 
     return data;

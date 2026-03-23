@@ -2,7 +2,7 @@ package costoptimizer
 
 import "github.com/diya-suryawanshi/cloud/graph-engine/graph"
 
-func AnalyzeCostSignals(g *graph.Graph) []CostSignal {
+func Analyze(g *graph.Graph) []CostSignal {
 
 	var signals []CostSignal
 
@@ -12,28 +12,25 @@ func AnalyzeCostSignals(g *graph.Graph) []CostSignal {
 			continue
 		}
 
+		wasteRatio := 1 - (node.Utilization / 100)
+
 		graphImpact := ComputeGraphImpact(g, node.ID)
 
-		waste := node.Cost * (1 - node.Utilization/100)
+		score := ComputeScore(node.Cost, wasteRatio, graphImpact, node.Environment)
 
-		forecast := ForecastCost(node.Cost, node.Utilization)
-
-		confidence := 1.0 - (graphImpact * 0.05)
-		if confidence < 0.3 {
-			confidence = 0.3
-		}
+		confidence := ComputeConfidence(graphImpact, node.Environment)
 
 		signals = append(signals, CostSignal{
-			NodeID:                node.ID,
-			ResourceType:          node.Type,
-			CurrentCost:           node.Cost,
-			Utilization:           node.Utilization,
-			WasteScore:            waste,
-			OptimizationPotential: waste / node.Cost,
-			GraphImpact:           graphImpact,
-			ForecastCost:          forecast,
-			Confidence:            confidence,
-			Reason:                "Graph-aware cost inefficiency",
+			NodeID:      node.ID,
+			Type:        node.Type,
+			Cost:        node.Cost,
+			Utilization: node.Utilization,
+			WasteRatio:  wasteRatio,
+			GraphImpact: graphImpact,
+			Env:         node.Environment,
+			Score:       score,
+			Confidence:  confidence,
+			Reason:      "Adaptive cost inefficiency detection",
 		})
 	}
 

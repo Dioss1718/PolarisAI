@@ -73,18 +73,11 @@ func main() {
 	// STEP 6: Cost Optimizer (UPDATED)
 	fmt.Println("\nRunning Cost Optimizer")
 
-	signals, candidates := costoptimizer.RunCostOptimizer(g)
+	signals := costoptimizer.Run(g)
 
 	for _, s := range signals {
-		fmt.Printf("Node: %-20s | WasteScore: %.2f | Forecast: %.2f | Confidence: %.2f\n",
-			s.NodeID, s.WasteScore, s.ForecastCost, s.Confidence)
-	}
-
-	fmt.Println("\nCost Optimization Candidates")
-
-	for _, c := range candidates {
-		fmt.Printf("Action: %-15s | Node: %-20s | DeltaCost: %.2f | Score: %.2f\n",
-			c.ActionType, c.NodeID, c.DeltaCost, c.Score)
+		fmt.Printf("Node: %-20s | WasteRatio: %.2f | Score: %.2f | Confidence: %.2f\n",
+			s.NodeID, s.WasteRatio, s.Score, s.Confidence)
 	}
 
 	// STEP 7: Summary

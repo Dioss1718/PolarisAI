@@ -1,21 +1,16 @@
 package costoptimizer
 
 type CostSignal struct {
-	NodeID                string
-	ResourceType          string
-	CurrentCost           float64
-	Utilization           float64
-	WasteScore            float64
-	OptimizationPotential float64
-	GraphImpact           float64
-	ForecastCost          float64
-	Confidence            float64
-	Reason                string
-}
+	NodeID      string
+	Type        string
+	Cost        float64
+	Utilization float64
 
-type CostCandidate struct {
-	NodeID     string
-	ActionType string
-	DeltaCost  float64
+	WasteRatio  float64
+	GraphImpact float64
+	Env         string
+
 	Score      float64
+	Confidence float64
+	Reason     string
 }
