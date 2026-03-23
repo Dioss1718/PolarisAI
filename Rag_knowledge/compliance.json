@@ -1,0 +1,188 @@
+{
+  "framework": "COMPLIANCE",
+  "description": "Universal rules — apply to ALL clouds (AWS, Azure, GCP)",
+  "rules": [
+    {
+      "id": "SOC2-CC6.1",
+      "framework": "SOC2",
+      "title": "Encryption at Rest Required",
+      "severity": "CRITICAL",
+      "cloud": "ALL",
+      "applies_to": ["DATABASE", "OBJECT_STORAGE", "COMPUTE"],
+      "conditions": {
+        "field": "encryption_at_rest",
+        "operator": "equals",
+        "value": false
+      },
+      "message": "[NODE_ID] has encryption_at_rest: false — SOC2-CC6.1 violated. All data at rest must be encrypted.",
+      "fix": "Enable encryption at rest on {node_id} immediately. In AWS: enable RDS/EBS encryption. In Azure: enable Azure Disk Encryption. In GCP: enable CMEK.",
+      "judge_scenarios": [
+        "Is my database secure?",
+        "What are my encryption violations?",
+        "Does my setup follow SOC2?",
+        "Which resources need immediate attention?",
+        "What compliance rules am I breaking?"
+      ]
+    },
+    {
+      "id": "SOC2-CC6.7",
+      "framework": "SOC2",
+      "title": "Backup Must Be Enabled",
+      "severity": "HIGH",
+      "cloud": "ALL",
+      "applies_to": ["DATABASE", "COMPUTE"],
+      "conditions": {
+        "field": "backup_enabled",
+        "operator": "equals",
+        "value": false
+      },
+      "message": "[NODE_ID] has backup_enabled: false — SOC2-CC6.7 violated. Data recovery capability is mandatory.",
+      "fix": "Enable automated backup on {node_id} with minimum 7-day retention. In AWS: enable RDS automated backups. In Azure: enable Azure Backup. In GCP: enable Cloud SQL backups.",
+      "judge_scenarios": [
+        "Is my data protected?",
+        "What happens if my database crashes?",
+        "Do I have disaster recovery?",
+        "What are my SOC2 violations?",
+        "Which resources have no backup?"
+      ]
+    },
+    {
+      "id": "SOC2-CC9.2",
+      "framework": "SOC2",
+      "title": "No Idle High-Cost Resources",
+      "severity": "MEDIUM",
+      "cloud": "ALL",
+      "applies_to": ["COMPUTE"],
+      "conditions": {
+        "operator": "AND",
+        "checks": [
+          { "field": "utilization", "operator": "less_than", "value": 20 },
+          { "field": "cost", "operator": "greater_than", "value": 100 }
+        ]
+      },
+      "message": "[NODE_ID] has utilization below 20% but cost above $100/month — SOC2-CC9.2 violated. Idle high-cost resources are a financial risk.",
+      "fix": "Downsize or stop {node_id}. Utilization is below 20% — resource is idle. In Azure: use Deallocate to stop all billing. In AWS: stop instance. In GCP: delete or resize.",
+      "judge_scenarios": [
+        "How much am I wasting?",
+        "Which resources are idle?",
+        "Am I overspending on cloud?",
+        "What are my cost violations?",
+        "Which instances should I stop?"
+      ]
+    },
+    {
+      "id": "PCI-DSS-1.2",
+      "framework": "PCI-DSS",
+      "title": "No Open Ports to Internet",
+      "severity": "CRITICAL",
+      "cloud": "ALL",
+      "applies_to": ["SECURITY_GROUP"],
+      "conditions": {
+        "field": "compliance_flags",
+        "operator": "contains",
+        "value": "PORT_0_0_0_0"
+      },
+      "message": "[NODE_ID] allows 0.0.0.0/0 inbound — PCI-DSS 1.2 violated. Open internet access to all ports is strictly prohibited.",
+      "fix": "Restrict {node_id} immediately. Remove 0.0.0.0/0 rule. Allow only specific IP ranges and required ports. This is a CRITICAL finding — fix before anything else.",
+      "judge_scenarios": [
+        "Is my network secure?",
+        "Are my ports open to internet?",
+        "What are my PCI-DSS violations?",
+        "What is my biggest security threat?",
+        "Which firewall rules are dangerous?"
+      ]
+    },
+    {
+      "id": "PCI-DSS-1.3",
+      "framework": "PCI-DSS",
+      "title": "Database Must Never Be Public",
+      "severity": "CRITICAL",
+      "cloud": "ALL",
+      "applies_to": ["DATABASE"],
+      "conditions": {
+        "operator": "AND",
+        "checks": [
+          { "field": "type", "operator": "equals", "value": "DATABASE" },
+          { "field": "exposure", "operator": "equals", "value": "PUBLIC" }
+        ]
+      },
+      "message": "[NODE_ID] is a DATABASE with PUBLIC exposure — PCI-DSS 1.3 violated. Direct public internet access to database is strictly prohibited.",
+      "fix": "Move {node_id} to private subnet immediately. No database should ever be directly accessible from the internet. Use a bastion host or VPN for admin access.",
+      "judge_scenarios": [
+        "Is my database exposed?",
+        "Can someone access my database from internet?",
+        "What are my PCI-DSS violations?",
+        "Which resources are critically exposed?",
+        "What is the blast radius of a breach?"
+      ]
+    },
+    {
+      "id": "PCI-DSS-7.1",
+      "framework": "PCI-DSS",
+      "title": "Least Privilege — No FullAccess IAM",
+      "severity": "HIGH",
+      "cloud": "ALL",
+      "applies_to": ["IAM_ROLE"],
+      "conditions": {
+        "field": "iam_policies",
+        "operator": "contains",
+        "value": "FullAccess"
+      },
+      "message": "[NODE_ID] has FullAccess IAM policy — PCI-DSS 7.1 violated. Access must be limited to minimum required permissions only.",
+      "fix": "Replace FullAccess on {node_id} with minimal required permissions. Identify exactly what actions this role needs and create a custom policy. Remove FullAccess immediately.",
+      "judge_scenarios": [
+        "Is my IAM setup secure?",
+        "Does my setup follow least privilege?",
+        "Which IAM roles are overprivileged?",
+        "What are my PCI-DSS violations?",
+        "Can an attacker escalate privileges?"
+      ]
+    },
+    {
+      "id": "ISO27001-A13",
+      "framework": "ISO27001",
+      "title": "Production Resource Must Not Be Public",
+      "severity": "HIGH",
+      "cloud": "ALL",
+      "applies_to": ["COMPUTE", "OBJECT_STORAGE", "LOAD_BALANCER"],
+      "conditions": {
+        "operator": "AND",
+        "checks": [
+          { "field": "exposure", "operator": "equals", "value": "PUBLIC" },
+          { "field": "environment", "operator": "equals", "value": "PROD" }
+        ]
+      },
+      "message": "[NODE_ID] is a PROD resource with PUBLIC exposure — ISO27001 Annex A.13.1.3 violated. Production resources must be network-segregated.",
+      "fix": "Move {node_id} behind a private subnet or firewall. PROD resources should not be directly internet-facing. Use load balancer or API gateway as the only public entry point.",
+      "judge_scenarios": [
+        "Are my production resources safe?",
+        "Which PROD resources are exposed?",
+        "Does my setup follow ISO27001?",
+        "What is my network segregation status?",
+        "Which cloud is least secure?"
+      ]
+    },
+    {
+      "id": "ISO27001-A9",
+      "framework": "ISO27001",
+      "title": "Admin Access Must Be Restricted",
+      "severity": "HIGH",
+      "cloud": "ALL",
+      "applies_to": ["IAM_ROLE"],
+      "conditions": {
+        "field": "compliance_flags",
+        "operator": "contains",
+        "value": "ADMIN_ACCESS"
+      },
+      "message": "[NODE_ID] has ADMIN_ACCESS flag — ISO27001 Annex A.9.2.3 violated. Privileged access rights must be strictly managed and audited.",
+      "fix": "Restrict admin privileges on {node_id}. Use role-based access control. Require MFA for all admin actions. Audit admin usage logs regularly.",
+      "judge_scenarios": [
+        "Who has admin access?",
+        "Is my privileged access managed?",
+        "Does my setup follow ISO27001?",
+        "Which roles have too much power?",
+        "What are my access control violations?"
+      ]
+    }
+  ]
+}

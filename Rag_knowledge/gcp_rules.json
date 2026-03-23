@@ -1,0 +1,80 @@
+{
+  "framework": "GCP",
+  "description": "GCP-specific rules + Cross-cloud rules — apply to GCP nodes and cross-cloud edges involving GCP",
+  "rules": [
+    {
+      "id": "GCP-LB-001",
+      "framework": "GCP",
+      "title": "GCP Load Balancer Sends Traffic to High-Risk Node in Another Cloud",
+      "severity": "HIGH",
+      "cloud": "GCP",
+      "applies_to": ["LOAD_BALANCER"],
+      "conditions": {
+        "operator": "CROSS_CLOUD_EDGE",
+        "edge_type": "TRAFFIC_TO",
+        "source_type": "LOAD_BALANCER",
+        "source_cloud": "GCP",
+        "target_cloud": "AWS",
+        "target_risk": "HIGH"
+      },
+      "message": "[NODE_ID] is a GCP Load Balancer sending TRAFFIC_TO a HIGH RISK node in AWS — GCP-LB-001 violated. GCP is routing production traffic to a compromised or at-risk AWS resource. GCP is now indirectly part of the attack surface. Source: GCP Cloud Security Best Practices.",
+      "fix": "Verify all traffic routing from {node_id}. Check if AWS target node risk has been resolved first. If AWS node is still HIGH RISK: add WAF rules on GCP LB, enable Cloud Armor, or reroute traffic to a secure endpoint. Do not send production traffic to unresolved HIGH RISK nodes.",
+      "judge_scenarios": [
+        "Is my GCP Load Balancer secure?",
+        "Is GCP affected by my AWS security issues?",
+        "What is the cross-cloud traffic risk?",
+        "Which GCP resources are indirectly at risk?",
+        "How does AWS risk affect GCP?"
+      ]
+    },
+    {
+      "id": "GCP-STORAGE-001",
+      "framework": "GCP",
+      "title": "GCP Storage Bucket Is Underutilized",
+      "severity": "LOW",
+      "cloud": "GCP",
+      "applies_to": ["OBJECT_STORAGE"],
+      "conditions": {
+        "operator": "AND",
+        "checks": [
+          { "field": "cloud_provider", "operator": "equals", "value": "GCP" },
+          { "field": "type", "operator": "equals", "value": "OBJECT_STORAGE" },
+          { "field": "utilization", "operator": "less_than", "value": 25 }
+        ]
+      },
+      "message": "[NODE_ID] is a GCP Storage bucket with utilization below 25% — GCP-STORAGE-001. Note: encryption and backup are enabled so this is a cost optimization finding only, not a security risk. Source: GCP Cost Optimization Framework.",
+      "fix": "Review storage class of {node_id}. If data is accessed infrequently: switch from Standard to Nearline (30-day access) or Coldline (90-day access) storage class. This can reduce storage costs by 40-80% with no security impact.",
+      "judge_scenarios": [
+        "How can I reduce my GCP storage costs?",
+        "Which GCP resources are underutilized?",
+        "Am I using the right GCP storage class?",
+        "How much can I save on GCP?",
+        "What are my GCP cost optimization opportunities?"
+      ]
+    },
+    {
+      "id": "GCP-CROSS-001",
+      "framework": "GCP",
+      "title": "High-Risk Azure Node Has Cross-Cloud Dependency on GCP",
+      "severity": "MEDIUM",
+      "cloud": "GCP",
+      "applies_to": ["OBJECT_STORAGE", "COMPUTE"],
+      "conditions": {
+        "operator": "CROSS_CLOUD_EDGE",
+        "edge_type": "DEPENDS_ON",
+        "source_cloud": "AZURE",
+        "source_risk": "HIGH",
+        "target_cloud": "GCP"
+      },
+      "message": "[NODE_ID] is a GCP resource that a HIGH RISK Azure node DEPENDS ON — GCP-CROSS-001 violated. If the Azure node is breached, the attacker can follow the DEPENDS_ON relationship to access this GCP resource. Cross-cloud blast radius confirmed. Source: Multi-cloud governance principle.",
+      "fix": "Restrict {node_id} access from the high-risk Azure node. Options: 1) Fix Azure node security issues first (close open ports, move to private subnet). 2) Add GCP IAM conditions to restrict access by source IP or identity. 3) Use GCP VPC Service Controls to isolate this resource.",
+      "judge_scenarios": [
+        "Is my GCP data safe if Azure is compromised?",
+        "What is the cross-cloud blast radius from Azure to GCP?",
+        "Which GCP resources are at risk from Azure issues?",
+        "How does an Azure breach affect my GCP resources?",
+        "What are my cross-cloud dependencies?"
+      ]
+    }
+  ]
+}

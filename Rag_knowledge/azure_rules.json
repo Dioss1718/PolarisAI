@@ -1,0 +1,105 @@
+{
+  "framework": "AZURE",
+  "description": "Azure-specific rules — apply ONLY to nodes where cloud_provider is AZURE",
+  "rules": [
+    {
+      "id": "AZ-VM-001",
+      "framework": "AZURE",
+      "title": "Azure VM Has Open Port With Public Exposure",
+      "severity": "HIGH",
+      "cloud": "AZURE",
+      "applies_to": ["COMPUTE"],
+      "conditions": {
+        "operator": "AND",
+        "checks": [
+          { "field": "cloud_provider", "operator": "equals", "value": "AZURE" },
+          { "field": "compliance_flags", "operator": "contains", "value": "OPEN_PORT" },
+          { "field": "exposure", "operator": "equals", "value": "PUBLIC" }
+        ]
+      },
+      "message": "[NODE_ID] is an Azure VM with OPEN_PORT flag and PUBLIC exposure — AZ-VM-001 violated. No Network Security Group restriction exists. Direct internet access to VM ports. Source: Azure Security Benchmark v3 NS-1.",
+      "fix": "Add Network Security Group rules to {node_id}. Allow only required ports (e.g. 443 for HTTPS, 22 only from specific IPs). Remove or restrict all open port rules. Apply NSG at both subnet and NIC level.",
+      "judge_scenarios": [
+        "Is my Azure VM secure?",
+        "Which Azure resources have open ports?",
+        "Does my Azure setup follow Security Benchmark?",
+        "What are my Azure network security issues?",
+        "Which Azure VMs are internet-facing?"
+      ]
+    },
+    {
+      "id": "AZ-VM-002",
+      "framework": "AZURE",
+      "title": "Idle Azure VM Must Be Deallocated Not Just Stopped",
+      "severity": "MEDIUM",
+      "cloud": "AZURE",
+      "applies_to": ["COMPUTE"],
+      "conditions": {
+        "operator": "AND",
+        "checks": [
+          { "field": "cloud_provider", "operator": "equals", "value": "AZURE" },
+          { "field": "utilization", "operator": "less_than", "value": 20 },
+          { "field": "cost", "operator": "greater_than", "value": 100 }
+        ]
+      },
+      "message": "[NODE_ID] is an Azure VM with utilization below 20% costing over $100/month — AZ-VM-002 violated. NOTE: In Azure, simply stopping a VM still charges for compute. You must DEALLOCATE it to stop billing. Source: Azure Cost Management Best Practices.",
+      "fix": "DEALLOCATE {node_id} from Azure Portal or CLI: az vm deallocate --name {node_id}. Do NOT just stop it — stopped Azure VMs still incur compute charges. Deallocated state stops all billing except storage.",
+      "judge_scenarios": [
+        "How do I stop Azure billing for idle VMs?",
+        "Which Azure resources am I wasting money on?",
+        "What is the difference between stopped and deallocated in Azure?",
+        "How much can I save on Azure?",
+        "Which Azure VMs should I deallocate?"
+      ]
+    },
+    {
+      "id": "AZ-STORAGE-001",
+      "framework": "AZURE",
+      "title": "Azure Blob Storage Must Not Be Publicly Accessible",
+      "severity": "HIGH",
+      "cloud": "AZURE",
+      "applies_to": ["OBJECT_STORAGE"],
+      "conditions": {
+        "operator": "AND",
+        "checks": [
+          { "field": "cloud_provider", "operator": "equals", "value": "AZURE" },
+          { "field": "exposure", "operator": "equals", "value": "PUBLIC" },
+          { "field": "compliance_flags", "operator": "contains", "value": "PUBLIC_BUCKET" }
+        ]
+      },
+      "message": "[NODE_ID] is an Azure Blob Storage container with PUBLIC exposure and PUBLIC_BUCKET flag — AZ-STORAGE-001 violated. Anonymous public read access is enabled. Anyone on the internet can read this data. Source: Azure Storage Security Guide.",
+      "fix": "Disable anonymous public access on {node_id}. In Azure Portal: Storage Account → Configuration → Allow Blob public access → Disabled. Also set container access level to Private. Enable Azure Defender for Storage.",
+      "judge_scenarios": [
+        "Is my Azure storage secure?",
+        "Can anyone access my Azure Blob data?",
+        "Which Azure storage containers are public?",
+        "What are my data exposure risks in Azure?",
+        "Does my Azure storage follow security best practices?"
+      ]
+    },
+    {
+      "id": "AZ-CROSS-001",
+      "framework": "AZURE",
+      "title": "High-Risk AWS Node Has Cross-Cloud Dependency on Azure",
+      "severity": "HIGH",
+      "cloud": "AZURE",
+      "applies_to": ["OBJECT_STORAGE", "COMPUTE"],
+      "conditions": {
+        "operator": "CROSS_CLOUD_EDGE",
+        "edge_type": "DEPENDS_ON",
+        "source_cloud": "AWS",
+        "source_risk": "HIGH",
+        "target_cloud": "AZURE"
+      },
+      "message": "[NODE_ID] is an Azure resource that a HIGH RISK AWS node DEPENDS ON — AZ-CROSS-001 violated. If the AWS node is compromised, the attacker can follow the DEPENDS_ON edge to reach this Azure resource. Blast radius spans across clouds. Source: Multi-cloud security blast radius containment principle.",
+      "fix": "Isolate {node_id} from the high-risk AWS dependency. Options: 1) Fix the AWS node risk first (close ports, fix IAM). 2) Add authentication between AWS node and Azure resource. 3) Use Azure Private Link to restrict access.",
+      "judge_scenarios": [
+        "Is my Azure data safe if AWS is compromised?",
+        "What is the cross-cloud blast radius?",
+        "Which Azure resources are at risk from AWS issues?",
+        "How does an AWS breach affect my Azure resources?",
+        "What are my cross-cloud security risks?"
+      ]
+    }
+  ]
+}
