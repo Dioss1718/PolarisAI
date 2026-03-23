@@ -1,47 +1,41 @@
 package costoptimizer
 
-import (
-	"github.com/diya-suryawanshi/cloud/graph-engine/graph"
-)
+import "github.com/diya-suryawanshi/cloud/graph-engine/graph"
 
-const (
-	LowUtilThreshold = 30.0
-)
+func AnalyzeCostSignals(g *graph.Graph) []CostSignal {
 
-func AnalyzeCosts(g *graph.Graph) []CostInsight {
-	var insights []CostInsight
+	var signals []CostSignal
 
 	for _, node := range g.Nodes {
 
-		// Skip zero-cost resources
 		if node.Cost == 0 {
 			continue
 		}
 
-		waste := 0.0
-		reason := ""
+		graphImpact := ComputeGraphImpact(g, node.ID)
 
-		// Idle resource detection
-		if node.Utilization < LowUtilThreshold {
-			waste = node.Cost * (1 - node.Utilization/100)
-			reason = "Low utilization resource"
+		waste := node.Cost * (1 - node.Utilization/100)
+
+		forecast := ForecastCost(node.Cost, node.Utilization)
+
+		confidence := 1.0 - (graphImpact * 0.05)
+		if confidence < 0.3 {
+			confidence = 0.3
 		}
 
-		// Overprovision detection (simple heuristic)
-		if node.Utilization < 20 {
-			waste += node.Cost * 0.2
-			reason = "Overprovisioned resource"
-		}
-
-		if waste > 0 {
-			insights = append(insights, CostInsight{
-				NodeID:      node.ID,
-				CurrentCost: node.Cost,
-				Waste:       waste,
-				Reason:      reason,
-			})
-		}
+		signals = append(signals, CostSignal{
+			NodeID:                node.ID,
+			ResourceType:          node.Type,
+			CurrentCost:           node.Cost,
+			Utilization:           node.Utilization,
+			WasteScore:            waste,
+			OptimizationPotential: waste / node.Cost,
+			GraphImpact:           graphImpact,
+			ForecastCost:          forecast,
+			Confidence:            confidence,
+			Reason:                "Graph-aware cost inefficiency",
+		})
 	}
 
-	return insights
+	return signals
 }

@@ -1,16 +1,12 @@
 package costoptimizer
 
-import (
-	"github.com/diya-suryawanshi/cloud/graph-engine/graph"
-)
+import "github.com/diya-suryawanshi/cloud/graph-engine/graph"
 
-func RunCostOptimizer(g *graph.Graph) ([]CostInsight, []CostAction) {
+func RunCostOptimizer(g *graph.Graph) ([]CostSignal, []CostCandidate) {
 
-	// Step 1: Analyze cost inefficiencies
-	insights := AnalyzeCosts(g)
+	signals := AnalyzeCostSignals(g)
 
-	// Step 2: Generate optimization actions
-	actions := GenerateCostActions(insights)
+	candidates := GenerateCostCandidates(signals)
 
-	return insights, actions
+	return signals, candidates
 }
