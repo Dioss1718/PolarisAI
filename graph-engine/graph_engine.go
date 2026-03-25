@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/joho/godotenv"
+
 	actiongenerator "github.com/diya-suryawanshi/cloud/agents/action-generator"
 	aiexplain "github.com/diya-suryawanshi/cloud/agents/ai-explainability"
 	candidategenerator "github.com/diya-suryawanshi/cloud/agents/candidate-generator"
@@ -15,44 +17,54 @@ import (
 	policyvalidator "github.com/diya-suryawanshi/cloud/agents/policy-validator"
 	securitysentinel "github.com/diya-suryawanshi/cloud/agents/security-sentinel"
 	riskengine "github.com/diya-suryawanshi/cloud/agents/security-sentinel/risk-engine"
+	gitops "github.com/diya-suryawanshi/cloud/gitops"
+
+	pluginpkg "github.com/diya-suryawanshi/cloud/graph-engine/plugin"
+
+	forecast "github.com/diya-suryawanshi/cloud/forecast"
+
 	"github.com/diya-suryawanshi/cloud/graph-engine/builder"
 	"github.com/diya-suryawanshi/cloud/graph-engine/services"
 )
 
 func main() {
+
 	fmt.Println("Starting Unified Cloud Graph Engine")
 	startTime := time.Now()
 
-	// ==============================
-	// STEP 1: Fetch Data
-	// ==============================
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Println(".env not found, using system env")
+	}
+	// register gitops plugin
+	pluginpkg.GitOps = &gitops.Plugin{}
+
+	// STEP 1: Fetch data
 	data, err := services.FetchSimulationData()
 	if err != nil {
 		log.Fatalf("Failed to fetch simulation data: %v", err)
 	}
 
+	// Convert to JSON
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		log.Fatalf("Failed to marshal data: %v", err)
 	}
 
+	// Parse JSON
 	var parsed map[string]interface{}
 	if err = json.Unmarshal(jsonData, &parsed); err != nil {
 		log.Fatalf("Failed to unmarshal data: %v", err)
 	}
 
-	// ==============================
-	// STEP 2: Build Graph
-	// ==============================
+	// STEP 2: Build graph
 	g := builder.BuildGraph(parsed)
 
 	fmt.Println("Graph successfully built")
 	fmt.Printf("Nodes: %d\n", len(g.Nodes))
 	fmt.Printf("Edges: %d\n", len(g.Edges))
 
-	// ==============================
-	// STEP 3: PARALLEL EXECUTION
-	// ==============================
+	// STEP 3: Run security + cost in parallel
 	var (
 		attackPaths [][]string
 		nodeRisks   map[string]float64
@@ -62,7 +74,7 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// 🔐 Security Sentinel
+	// Security analysis
 	go func() {
 		defer wg.Done()
 
@@ -83,7 +95,7 @@ func main() {
 		}
 	}()
 
-	// 💰 Cost Optimizer
+	// Cost analysis
 	go func() {
 		defer wg.Done()
 
@@ -99,9 +111,7 @@ func main() {
 
 	wg.Wait()
 
-	// ==============================
-	// STEP 4: CANDIDATE GENERATOR
-	// ==============================
+	// STEP 4: Candidate generation
 	fmt.Println("\nRunning Candidate Generator")
 
 	candidates := candidategenerator.GenerateCandidates(g, signals, nodeRisks)
@@ -118,9 +128,7 @@ func main() {
 		)
 	}
 
-	// ==============================
-	// STEP 5: ACTION GENERATOR
-	// ==============================
+	// STEP 5: Action generation
 	fmt.Println("\nRunning Action Generator")
 
 	actions := actiongenerator.GenerateActions(g, candidates)
@@ -137,9 +145,7 @@ func main() {
 		)
 	}
 
-	// ==============================
-	// STEP 6: CONVERT → PARETO
-	// ==============================
+	// STEP 6: Convert to Pareto input
 	var paretoActions []negotiation.Action
 
 	for _, a := range actions {
@@ -152,9 +158,7 @@ func main() {
 		paretoActions = append(paretoActions, pa)
 	}
 
-	// ==============================
-	// STEP 7: PARETO OPTIMIZER
-	// ==============================
+	// STEP 7: Pareto optimization
 	fmt.Println("\nRunning Pareto Optimizer")
 
 	decisions := negotiation.RunParetoOptimizer(g, paretoActions)
@@ -169,9 +173,7 @@ func main() {
 		fmt.Printf("Reason: %s\n", d.Reason)
 	}
 
-	// ==============================
-	// STEP 8: POLICY VALIDATOR (FIXED)
-	// ==============================
+	// STEP 8: Policy validation
 	fmt.Println("\nRunning Policy Validator")
 
 	policy := policyvalidator.Policy{
@@ -181,21 +183,20 @@ func main() {
 		EncryptionRequired: true,
 	}
 
+	decisionsGitops := make([]gitops.Decision, 0)
+
 	for _, d := range decisions {
 
 		node := g.Nodes[d.NodeID]
 
-		// Compute centrality (same logic as elsewhere)
 		centrality := float64(len(g.Adjacency[d.NodeID])) / 5.0
-
-		// Get risk
 		risk := nodeRisks[d.NodeID]
 
 		input := policyvalidator.InputDecision{
 			NodeID:        d.NodeID,
 			Action:        d.Action,
-			CostDelta:     0, // optional for now
-			RiskReduction: 0, // optional for now
+			CostDelta:     0,
+			RiskReduction: 0,
 		}
 
 		scores := policyvalidator.ValidateAll(
@@ -208,7 +209,6 @@ func main() {
 			risk,
 		)
 
-		// 🔥 FINAL DECISION LOGIC (IMPORTANT)
 		finalScore :=
 			0.3*scores.SLA +
 				0.3*scores.Security +
@@ -228,12 +228,37 @@ func main() {
 			finalScore,
 		)
 
+		if status == "REJECTED" {
+			continue
+		}
+
+		decisionsGitops = append(decisionsGitops, gitops.Decision{
+			NodeID:      d.NodeID,
+			Action:      d.Action,
+			FinalAction: d.Action,
+			Score:       finalScore,
+			Reason:      "Policy Approved",
+		})
+	}
+
+	// STEP 9: Forecast (added)
+	fmt.Println("\nRunning Forecast")
+
+	for _, d := range decisionsGitops {
+
+		res, err := forecast.Get(d.NodeID)
+		if err != nil {
+			fmt.Printf("Node: %-20s | Forecast Error: %v\n", d.NodeID, err)
+			continue
+		}
+
 		fmt.Printf(
-			"SLA: %.2f | Security: %.2f | Compliance: %.2f | Blast: %.2f\n",
-			scores.SLA,
-			scores.Security,
-			scores.Compliance,
-			scores.Blast,
+			"Node: %-20s | Current: %.2f | F30: %.2f | F90: %.2f | Shock: %v\n",
+			res.NodeID,
+			res.CurrentCost,
+			res.Forecast30,
+			res.Forecast90,
+			res.BillShock,
 		)
 	}
 	// ==============================
@@ -298,12 +323,59 @@ func main() {
 	}
 
 	fmt.Printf("\nAI Layer Time: %v\n", time.Since(aiStart))
-	// ==============================
-	// FINAL SUMMARY
-	// ==============================
+	// STEP 10: GitOps
+	fmt.Println("running gitops")
+
+	var prs []gitops.PRResponse
+
+	if pluginpkg.GitOps != nil {
+		prs, _ = pluginpkg.GitOps.Run(g, decisionsGitops, nodeRisks)
+	}
+
+	// STEP 11: Wait for merge
+	merged := false
+
+	if len(prs) > 0 {
+
+		pr := prs[0]
+
+		if pr.PRNumber != 0 {
+
+			fmt.Printf("\nMerge PR #%d\n", pr.PRNumber)
+
+			merged = gitops.WaitForPRMerge(pr.PRNumber, pr.Branch)
+		}
+	}
+
+	// STEP 12: Apply changes
+	if merged {
+
+		newGraph := gitops.GenerateFullProposedGraph(g, decisionsGitops)
+
+		if gitops.EvaluateGraph(newGraph, nodeRisks).TotalRisk <
+			gitops.EvaluateGraph(g, nodeRisks).TotalRisk {
+
+			g = newGraph
+			fmt.Println("Graph Updated")
+		}
+
+	} else {
+		fmt.Println("No PR merged")
+	}
+
+	// FINAL OUTPUT
+	paths := securitysentinel.FindAttackPaths(g)
+
+	fmt.Println("\nFinal Graph (Paths):")
+
+	for i, path := range paths {
+		fmt.Printf("Path %d -> %v\n", i+1, path)
+	}
+
+	// SUMMARY
 	fmt.Println("\nExecution Summary")
 	fmt.Printf("Total Time    : %v\n", time.Since(startTime))
-	fmt.Printf("Attack Paths  : %d\n", len(attackPaths))
+	fmt.Printf("Attack Paths  : %d\n", len(paths))
 	fmt.Printf("Nodes Analyzed: %d\n", len(g.Nodes))
 
 	fmt.Println("\nExecution Completed Successfully")

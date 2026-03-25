@@ -1,1 +1,16 @@
-invalid type: string "TITLE: Cost Optimization Guidelines\n\nDESCRIPTION:\nOptimize cloud usage to reduce unnecessary spending.\n\nRULES:\n- Remove unused resources.\n- Use right-sized instances.\n- Monitor utilization regularly.\n\nRISKS:\n- Over-provisioned resources increase cost.\n- Idle resources waste budget.\n\nREMEDIATIONS:\n- Terminate unused instances.\n only if ≥1 consecutive minute\n
+SERVICE: Google Cloud SQL
+TYPE: DATABASE
+
+UPTIME GUARANTEE:
+
+Cloud SQL Enterprise Plus (HA or read pool ≥2 nodes): ≥99.99%
+Cloud SQL Enterprise (HA): ≥99.95%
+Uptime calculated monthly per instance
+
+FAILURE CONDITIONS:
+
+Downtime occurs when all valid requests to:
+HA instance fail, or
+Read pool instance fail
+Downtime counted only if ≥1 consecutive minute
+ of recovery increases downtime.\n\ng
