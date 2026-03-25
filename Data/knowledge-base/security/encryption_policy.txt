@@ -1,0 +1,25 @@
+TITLE: Encryption and Data Protection
+
+DESCRIPTION:
+Encryption protects data at rest and in transit.
+
+RULES:
+- All sensitive data must be encrypted at rest.
+- Use TLS for data in transit.
+- Manage encryption keys securely.
+
+RISKS:
+- Unencrypted data can be leaked or stolen.
+- Weak encryption leads to compliance violations.
+
+REMEDIATIONS:
+- Enable encryption for storage and databases.
+- Use managed key services.
+- Rotate encryption keys periodically.
+
+CONSTRAINTS:
+- STORAGE and DATABASE must have encryption enabled.
+- Public endpoints must enforce HTTPS.
+
+SIGNAL KEYWORDS:
+encryption, tls, https, key, secure, data protection

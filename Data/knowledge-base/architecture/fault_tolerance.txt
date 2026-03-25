@@ -1,0 +1,25 @@
+TITLE: Fault Tolerance Strategies
+
+DESCRIPTION:
+Fault tolerance ensures system continues functioning during failures.
+
+RULES:
+- Design systems to handle partial failures.
+- Use retry mechanisms and circuit breakers.
+- Isolate failures to prevent cascading issues.
+
+RISKS:
+- Cascading failures can bring down entire system.
+- Lack of recovery increases downtime.
+
+REMEDIATIONS:
+- Implement fallback systems.
+- Use monitoring and alerting.
+- Enable automated recovery.
+
+CONSTRAINTS:
+- Critical nodes must have failover strategies.
+- Systems must tolerate node-level failure.
+
+SIGNAL KEYWORDS:
+fault, failure, recovery, resilience, retry

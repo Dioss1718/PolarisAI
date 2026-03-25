@@ -1,0 +1,34 @@
+TITLE: CIS Google Cloud Platform Foundation Benchmark v4.0.0 Overview
+
+DESCRIPTION:
+Security hardening benchmark for Google Cloud Platform organizational and service configuration controls.
+Recommendations are organized into Level 1 and Level 2 profiles, with manual and automated assessment statuses, and are intended to define secure configuration baselines for GCP resources.
+
+RULES:
+- Use Level 1 as the baseline practical and prudent hardening profile.
+- Treat Level 2 as an extension of Level 1, not a standalone profile.
+- Preserve each recommendation’s documented assessment status as Manual or Automated.
+- Validate controls using the benchmark’s explicit audit procedures and expected states.
+- Apply organization, folder, and project scope checks where recommendations target IAM or organization policy.
+- Preserve impact statements before enforcing restrictive controls.
+
+RISKS:
+- Treating Level 2 as standalone can cause incomplete control coverage.
+- Ignoring assessment status can produce invalid automation assumptions.
+- Applying project-only validation to controls that also require folder or organization review can miss inherited risk.
+- Omitting scope context in RAG chunks can reduce retrieval accuracy for organization policy controls.
+
+REMEDIATIONS:
+- Split ingestion into overview plus per-control files with scope metadata (organization, folder, project, service).
+- Capture manual versus automated status exactly as written.
+- Include audit, remediation, and prevention notes where present.
+- Record profile applicability and resource scope in each downstream control file.
+
+CONSTRAINTS:
+- Level 2 extends Level 1 and is not standalone.
+- Recommendations may require organization-, folder-, and project-level review depending on control scope.
+- The benchmark explicitly distinguishes Manual and Automated assessment states; do not convert manual controls into assumed automation.
+- The benchmark is a secure-configuration baseline and should be applied with documented impact review.
+
+SIGNAL KEYWORDS:
+cis benchmark, gcp foundation, google cloud platform, level 1, level 2, secure configuration baseline, organization policy, project iam, folder iam, manual control, automated control, cloud hardening

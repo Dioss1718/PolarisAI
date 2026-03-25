@@ -1,0 +1,83 @@
+SERVICE: Amazon EC2 (Elastic Compute Cloud)
+TYPE: COMPUTE
+
+UPTIME GUARANTEE:
+
+Region-Level SLA: 99.99% monthly uptime when instances are deployed across ≥2 Availability Zones (AZs) or ≥2 regions
+Instance-Level SLA: 99.5% monthly uptime per individual EC2 instance
+Automatic hourly credit: No charge for any instance unavailable for >6 minutes in a clock hour
+
+FAILURE CONDITIONS:
+
+Instance-Level: Instance has no external network connectivity
+Region-Level: All instances across ≥2 AZs (or cross-region if single AZ) simultaneously have no external connectivity
+Downtime measured as percentage of unavailable minutes in a monthly billing cycle
+
+SERVICE CREDITS:
+
+Region-Level SLA:
+
+<99.99% and ≥99.0% → 10% credit
+<99.0% and ≥95.0% → 30% credit
+<95.0% → 100% credit
+
+Instance-Level SLA:
+
+<99.5% and ≥99.0% → 10% credit
+<99.0% and ≥95.0% → 30% credit
+<95.0% → 100% credit
+Credits apply only to future EC2 payments
+No refunds; minimum credit must exceed $1
+Claims must be submitted within 2 billing cycles
+Region-Level and Instance-Level claims cannot be combined
+
+IMPORTANT RULES:
+
+SLA applies per account and per region or per instance
+Multi-AZ deployment is required for higher (99.99%) SLA coverage
+Must provide logs, timestamps, and resource IDs to claim credits
+Credits are the sole remedy for service failure
+Excludes one-time payments (e.g., Reserved Instances upfront costs)
+AWS validation of outage is mandatory
+
+Exclusions:
+
+Force majeure events
+Internet/network issues outside AWS boundary
+Customer misconfiguration or failure to respond to recovery events
+Customer-owned hardware/software failures
+Account suspension or termination by AWS
+
+ARCHITECTURE BEST PRACTICES:
+
+Deploy workloads across multiple AZs to qualify for Region-Level SLA
+Use multi-region architecture for critical workloads
+Implement health checks and auto-recovery mechanisms
+Enable logging and monitoring for SLA claim validation
+Avoid single-instance architectures for production systems
+Design for fault tolerance and failover
+
+SECURITY / COMPLIANCE NOTES:
+
+Customer must maintain logs for SLA verification
+Sensitive data in logs must be redacted before submission
+Responsibility for configuration and availability monitoring lies with customer (shared responsibility model)
+
+RISK IMPLICATION:
+
+Single-instance deployments have lower availability guarantee (99.5%)
+Misconfiguration or lack of redundancy leads to no SLA protection
+External dependency failures (e.g., ISP issues) are not covered
+Financial compensation is limited to service credits only (no direct refunds)
+
+ACTION IMPACT:
+
+TERMINATE → Loss of SLA coverage and potential downtime impact
+DOWNSIZE → May reduce redundancy, increasing risk of SLA violation
+SECURE → Improves resilience against misconfiguration-related exclusions
+SCALE → Horizontal scaling across AZs increases availability and SLA compliance
+
+CONSTRAINT TAGS:
+[TAG: SLA]
+[TAG: COMPUTE]
+[TAG: HIGH_AVAILABILITY_RISK]

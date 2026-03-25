@@ -1,0 +1,94 @@
+SERVICE: Google Cloud SQL
+TYPE: DATABASE
+
+UPTIME GUARANTEE:
+
+Cloud SQL Enterprise Plus (HA or read pool ≥2 nodes): ≥99.99%
+Cloud SQL Enterprise (HA): ≥99.95%
+Uptime calculated monthly per instance
+
+FAILURE CONDITIONS:
+
+Downtime occurs when all valid requests to:
+HA instance fail, or
+Read pool instance fail
+Downtime counted only if ≥1 consecutive minute
+Intermittent failures <1 minute are excluded
+Scheduled maintenance downtime excluded (for Enterprise edition)
+
+SERVICE CREDITS:
+
+Enterprise Plus:
+
+99.0% – <99.99% → 10%
+95.0% – <99.0% → 25%
+<95.0% → 100%
+
+Enterprise:
+
+99.0% – <99.95% → 10%
+95.0% – <99.0% → 25%
+<95.0% → 50%
+Credits applied to future billing only
+Max credit:
+Enterprise Plus → up to 100%
+Enterprise → up to 50%
+Claims must be submitted within 30 days
+
+IMPORTANT RULES:
+
+SLA applies only to:
+HA-enabled instances
+Read pools with ≥2 nodes
+Excludes:
+Shared-core instances
+Single-zone instances
+Read pools with 1 node
+Must provide logs and proof of downtime
+Credits are sole remedy for SLA violations
+Google validates all claims
+
+Exclusions:
+
+Pre-GA, deprecated, or excluded features
+Force majeure events
+Customer or third-party system failures
+Abuse or violation of agreement
+Quota limitations
+Customer-initiated restarts
+
+ARCHITECTURE BEST PRACTICES:
+
+Use HA configuration for all production databases
+Use read pools with ≥2 nodes for scalability and redundancy
+Avoid single-zone deployments
+Configure maintenance windows strategically
+Implement retry and failover logic
+Monitor instance health and availability metrics
+
+SECURITY / COMPLIANCE NOTES:
+
+Customer responsible for request validity and configuration
+Logs required for SLA claims must be maintained
+Shared responsibility model applies
+Misconfiguration or improper usage invalidates SLA claims
+
+RISK IMPLICATION:
+
+Non-HA deployments have no SLA protection
+Scheduled maintenance may impact availability (excluded from SLA)
+Customer-initiated restarts invalidate SLA claims
+Enterprise tier has lower maximum compensation (50%)
+Compensation limited to service credits only
+
+ACTION IMPACT:
+
+TERMINATE → Loss of database availability and SLA protection
+DOWNSIZE → Removing HA increases downtime risk and removes SLA coverage
+SECURE → Prevents SLA exclusions due to misconfiguration
+SCALE → Adding read replicas improves availability and SLA compliance
+
+CONSTRAINT TAGS:
+[TAG: SLA]
+[TAG: DATABASE]
+[TAG: HIGH_AVAILABILITY_DEPENDENCY]

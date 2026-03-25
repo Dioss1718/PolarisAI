@@ -1,0 +1,94 @@
+SERVICE: Microsoft Online Services (General SLA Framework)
+TYPE: MULTI_SERVICE
+
+UPTIME GUARANTEE:
+
+Service Levels defined per individual service (not global)
+Uptime measured over:
+30-day Applicable Period (Azure Pay-As-You-Go services)
+Monthly billing cycle (other services)
+Uptime calculated based on Downtime excluding Scheduled Downtime
+
+FAILURE CONDITIONS:
+
+Downtime defined per service (e.g., login failure, API failure, connectivity loss)
+Incident = single or multiple events causing service unavailability
+Failure includes:
+No external connectivity
+API failures (Error Codes)
+Authentication or operation failures
+Scheduled Downtime is excluded from failure calculation
+
+SERVICE CREDITS:
+
+Credits issued as % of Applicable Service Fees
+Max credit ≤ total monthly service fees for affected service
+No compensation for indirect losses (e.g., revenue loss)
+Only one Service Credit per service per Applicable Period
+
+General Credit Pattern (varies by service):
+
+Minor SLA breach → ~10%
+Moderate breach → ~25–50%
+Severe breach → up to 100%
+
+IMPORTANT RULES:
+
+SLA applies only to paid services (free tiers and previews excluded)
+Claims must include:
+Incident description
+timestamps and duration
+affected resources
+logs and error details
+Azure claims: must be submitted within 60 days
+Other services: claim within next billing cycle
+Microsoft validates claims and processes within ~45 days
+Credits are the sole remedy for SLA violations
+
+Exclusions:
+
+Force majeure events (natural disasters, war, etc.)
+External network or device failures
+Third-party software/services issues
+Customer misconfiguration or security failures
+Unsupported configurations or exceeding quotas
+Scheduled maintenance windows
+Performance degradation without full outage
+User-initiated operations (restart, scale, failover)
+
+ARCHITECTURE BEST PRACTICES:
+
+Design geo-redundant and multi-region architectures
+Avoid dependency on single datacenter deployments
+Implement monitoring and logging (Azure Monitor recommended)
+Use supported configurations and follow service guidelines
+Avoid exceeding quotas and throttling limits
+Implement retry and fault-tolerant patterns
+Design for failover and resilience
+
+SECURITY / COMPLIANCE NOTES:
+
+Customer responsible for security configuration and access control
+Logs required for SLA claims must be provided and validated
+Shared responsibility model applies across all services
+Unauthorized access due to weak security practices invalidates SLA claims
+
+RISK IMPLICATION:
+
+Single-region or non-resilient deployments are not protected
+Misconfiguration or unsupported usage voids SLA coverage
+No financial compensation beyond service credits
+Performance issues without full outages are not covered
+Dependency on third-party or external networks increases risk exposure
+
+ACTION IMPACT:
+
+TERMINATE → Loss of SLA coverage and service continuity
+DOWNSIZE → Increased risk of throttling, performance issues, SLA breach
+SECURE → Reduces risk of exclusion due to unauthorized access or misconfiguration
+SCALE → Improves resilience, availability, and SLA compliance
+
+CONSTRAINT TAGS:
+[TAG: SLA]
+[TAG: MULTI_SERVICE]
+[TAG: ENTERPRISE_RISK]

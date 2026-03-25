@@ -1,0 +1,25 @@
+TITLE: Database Security Guidelines
+
+DESCRIPTION:
+Databases store critical application data and must be secured.
+
+RULES:
+- Do not expose databases to the public internet.
+- Enable authentication and strong passwords.
+- Use encryption for data storage.
+
+RISKS:
+- Public database exposure leads to data breaches.
+- Weak authentication allows unauthorized access.
+
+REMEDIATIONS:
+- Place databases in private networks.
+- Enable encryption and backup policies.
+- Monitor access logs.
+
+CONSTRAINTS:
+- DATABASE must not be PUBLIC.
+- DATABASE must be encrypted.
+
+SIGNAL KEYWORDS:
+database, db, sql, storage, private, access

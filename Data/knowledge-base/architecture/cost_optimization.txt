@@ -1,0 +1,24 @@
+TITLE: Cost Optimization Guidelines
+
+DESCRIPTION:
+Optimize cloud usage to reduce unnecessary spending.
+
+RULES:
+- Remove unused resources.
+- Use right-sized instances.
+- Monitor utilization regularly.
+
+RISKS:
+- Over-provisioned resources increase cost.
+- Idle resources waste budget.
+
+REMEDIATIONS:
+- Terminate unused instances.
+- Downsize underutilized resources.
+- Use auto-scaling.
+
+CONSTRAINTS:
+- High waste ratio (>0.7) indicates optimization opportunity.
+
+SIGNAL KEYWORDS:
+cost, waste, utilization, optimization, pricing

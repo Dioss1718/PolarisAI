@@ -1,0 +1,42 @@
+TITLE: AWS CIS Benchmark Usage and Governance Model
+
+DESCRIPTION:
+CIS Benchmarks provide prescriptive security configuration guidance for AWS services.
+They are designed as a baseline within a broader cybersecurity program and must be applied with proper versioning, validation, and governance controls.
+
+RULES:
+- Apply only the benchmark version that matches the target service and configuration model.
+- Use the most recent benchmark version to avoid outdated audit and remediation methods.
+- Implement both Automated and Manual recommendations; neither can be ignored.
+- Validate all remediation changes in non-production environments before deployment.
+- Deploy remediation incrementally (test → limited rollout → full deployment).
+- Ensure cross-functional collaboration (security, ops, dev, audit) during implementation.
+- Document all exceptions with justification and audit traceability.
+- Use benchmarks as a baseline, not absolute requirements; adapt based on risk profile.
+- Monitor systems continuously for vulnerabilities, patching, and activity logging.
+
+RISKS:
+- Applying incorrect benchmark versions leads to invalid compliance results.
+- Skipping manual controls results in incomplete security posture.
+- Direct production remediation without testing may cause system failures.
+- Lack of documentation for exceptions creates audit and compliance failures.
+- Using outdated benchmarks introduces incorrect or insecure configurations.
+- Ignoring cross-functional validation leads to misaligned or insecure deployments.
+
+REMEDIATIONS:
+- Validate benchmark applicability before assessment (service, version, environment).
+- Establish a staging/lab environment for testing all configuration changes.
+- Implement phased rollout strategy for remediation across production systems.
+- Maintain centralized documentation for exceptions and risk acceptance.
+- Use CIS-CAT or certified tools to automate scalable assessments where applicable.
+- Regularly update benchmarks and re-assess configurations for drift.
+
+CONSTRAINTS:
+- Benchmarks MUST NOT be applied to unsupported or mismatched service configurations.
+- Both Manual and Automated recommendations MUST be considered in scope.
+- Production systems MUST NOT be modified without prior testing and validation.
+- Exceptions MUST be formally documented and justified for audit purposes.
+- Benchmark content MUST NOT be redistributed or hosted outside authorized platforms.
+
+SIGNAL KEYWORDS:
+cis benchmark, aws security baseline, benchmark versioning, remediation strategy, audit compliance, configuration hardening, security governance, cloud security controls, cis-cat, risk exception handling

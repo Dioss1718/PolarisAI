@@ -1,0 +1,35 @@
+TITLE: CIS Google Workspace Foundations Benchmark v1.3.0 Overview
+
+DESCRIPTION:
+Security hardening benchmark for Google Workspace Enterprise administrative controls.
+Defines manual security recommendations organized by admin console areas such as Directory, Apps, Security, and access/data control, using Enterprise Level 1 and Enterprise Level 2 profiles.
+
+RULES:
+- Apply only to Google Workspace deployments with an Enterprise license.
+- Use Enterprise Level 1 recommendations as the baseline profile.
+- Treat Enterprise Level 2 as an extension of Enterprise Level 1, not a standalone profile.
+- Validate each recommendation using the benchmark’s documented manual audit steps.
+- Preserve documented impact statements before enforcing restrictive settings.
+- Implement recommendations through Google Workspace Admin Console paths specified by the benchmark.
+
+RISKS:
+- Misapplying controls outside Google Workspace Enterprise may create unsupported assumptions.
+- Applying Level 2 controls without reviewing impact may reduce usability or performance.
+- Ignoring manual validation steps may lead to false compliance reporting.
+- Combining unrelated sections into one retrieval chunk may reduce RAG precision.
+
+REMEDIATIONS:
+- Separate benchmark ingestion into overview, section-level, and per-control RAG files.
+- Tag each recommendation with its profile applicability and admin console path.
+- Preserve manual/automated status exactly as documented.
+- Include audit and remediation steps as distinct structured fields in downstream control files.
+
+CONSTRAINTS:
+- Scope is focused on Google Workspace Enterprise customer deployments.
+- Enterprise Level 2 extends Enterprise Level 1 and is not standalone.
+- The benchmark uses manual recommendations in many areas; do not assume automation where not stated.
+- Devices section is outside scope for this benchmark; Chrome settings are covered by the CIS Chrome Benchmark and Mobile & endpoint settings are planned for a future benchmark.
+- Do not host or redistribute CIS benchmark PDFs on non-CIS-owned sites.
+
+SIGNAL KEYWORDS:
+cis benchmark, google workspace, workspace enterprise, enterprise level 1, enterprise level 2, admin console, directory, apps, security, access and data control, manual audit, hardening baseline

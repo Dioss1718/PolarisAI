@@ -1,0 +1,84 @@
+SERVICE: Amazon S3 (Simple Storage Service)
+TYPE: STORAGE
+
+UPTIME GUARANTEE:
+
+Uptime measured as Monthly Uptime Percentage based on Error Rates per 5-minute interval
+Standard SLA (S3 Standard, S3 Express One Zone, Glacier Flexible Retrieval, Glacier Deep Archive, others): ≥99.9%
+Reduced SLA (Intelligent-Tiering, Standard-IA, One Zone-IA, Glacier Instant Retrieval): ≥99.0%
+
+FAILURE CONDITIONS:
+
+Failure defined as non-zero Error Rate during a 5-minute interval
+Error Rate = InternalError or ServiceUnavailable responses / total requests
+Monthly uptime derived from average Error Rates across all 5-minute intervals
+Intervals with no requests are treated as 0% error rate
+
+SERVICE CREDITS:
+
+Standard SLA Classes:
+
+<99.9% and ≥99.0% → 10% credit
+<99.0% and ≥95.0% → 25% credit
+<95.0% → 100% credit
+
+Reduced SLA Classes:
+
+<99.0% and ≥98.0% → 10% credit
+<98.0% and ≥95.0% → 25% credit
+<95.0% → 100% credit
+Credits apply only to future S3 payments
+No refunds; minimum credit must exceed $1
+Claims must be submitted within 2 billing cycles
+Credits apply per storage class and region (or AZ for S3 Express One Zone)
+
+IMPORTANT RULES:
+
+SLA applies per storage class and request type
+Must submit logs, timestamps, and error records to claim credits
+Credits are the sole remedy for service failures
+AWS validation required for claim approval
+Error rate calculation excludes failures caused by SLA exclusions
+
+Exclusions:
+
+Force majeure events
+Network/internet issues outside AWS boundary
+Customer actions or misconfigurations
+Customer infrastructure or software failures
+Account suspension or termination by AWS
+
+ARCHITECTURE BEST PRACTICES:
+
+Use appropriate storage class based on availability requirements
+Avoid reliance on infrequent access or archival classes for critical workloads
+Implement retry logic for failed requests
+Monitor error rates and request metrics
+Distribute workloads across regions for higher resilience
+Use redundancy and replication strategies
+
+SECURITY / COMPLIANCE NOTES:
+
+Logs required for SLA claims must redact sensitive information
+Customer responsible for request monitoring and error tracking
+Shared responsibility model applies for data access patterns and usage
+
+RISK IMPLICATION:
+
+Lower-tier storage classes have reduced availability guarantees
+High error rates directly impact SLA compliance
+No activity (no requests) may mask availability issues
+Compensation limited to service credits only
+Misconfiguration or improper usage invalidates SLA claims
+
+ACTION IMPACT:
+
+TERMINATE → Loss of data access and SLA protection
+DOWNSIZE → Switching to lower-tier storage increases availability risk
+SECURE → Reduces risk of misconfiguration and unauthorized failures
+SCALE → Increased request volume requires monitoring to avoid error spikes
+
+CONSTRAINT TAGS:
+[TAG: SLA]
+[TAG: STORAGE]
+[TAG: AVAILABILITY_RISK]

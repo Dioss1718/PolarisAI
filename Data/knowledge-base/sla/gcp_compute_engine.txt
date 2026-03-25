@@ -1,0 +1,104 @@
+SERVICE: Google Compute Engine
+TYPE: COMPUTE
+
+UPTIME GUARANTEE:
+
+Premium Tier (excluding Mexico, Stockholm):
+Multi-zone instances: ≥99.99%
+Single instance (memory optimized): ≥99.95%
+Single instance (other families): ≥99.9%
+Load balancing: ≥99.99%
+Premium Tier (Mexico, Stockholm):
+Multi-zone instances: ≥99.95%
+Single instance: ≥99.9%
+Load balancing: ≥99.95%
+Standard Tier:
+Multi-zone instances: ≥99.9%
+Load balancing: ≥99.9%
+Uptime calculated monthly per project per region or per instance
+
+FAILURE CONDITIONS:
+
+VM instance: loss of external connectivity or persistent disk access
+Multi-zone: all instances across zones lose connectivity simultaneously
+Load balancing: loss of external connectivity with all healthy backend instances
+Downtime counted only if ≥1 consecutive minute
+Intermittent or sub-minute failures are excluded
+
+SERVICE CREDITS:
+
+Multi-zone & Load Balancing (Premium/Standard):
+
+99.00% – < SLO → 10% credit
+95.00% – < 99.00% → 25% credit
+<95.00% → 100% credit
+
+(Mexico & Stockholm adjusted thresholds apply but same credit percentages)
+
+Single Instance (Memory Optimized):
+
+95.00% – <99.95% → 10%
+90.00% – <95.00% → 25%
+<90.00% → 100%
+
+Single Instance (Other Families):
+
+95.00% – <99.9% → 10%
+90.00% – <95.00% → 25%
+<90.00% → 100%
+Credits applied to future billing only
+Max credit capped at monthly service charges
+Claims must be submitted within 60 days
+
+IMPORTANT RULES:
+
+SLA applies per project, region, and instance type
+Cannot claim both single-instance and multi-zone SLA simultaneously
+Must provide logs with timestamps and downtime proof
+Credits are sole remedy for SLA violations
+Google validates all claims
+
+Exclusions:
+
+Pre-GA or excluded features
+Force majeure events
+Customer or third-party software/hardware failures
+Violations of usage policies
+Quota limits or system throttling
+Google VPN failures (covered under separate SLA)
+
+ARCHITECTURE BEST PRACTICES:
+
+Deploy instances across multiple zones for highest SLA (99.99%)
+Use load balancing with health checks for resilience
+Avoid single-instance deployments for critical workloads
+Use Premium Tier networking for higher availability
+Implement redundancy and failover strategies
+Monitor instance health and connectivity
+
+SECURITY / COMPLIANCE NOTES:
+
+Customer responsible for configuration, monitoring, and logging
+Logs must be provided for SLA claims
+Shared responsibility model applies
+Misuse or policy violations invalidate SLA claims
+
+RISK IMPLICATION:
+
+Single-instance deployments have significantly lower reliability guarantees
+Regional limitations (Mexico, Stockholm) reduce SLA guarantees
+Sub-minute outages are not counted → hidden availability risk
+Network tier selection directly impacts SLA
+Compensation limited to service credits only
+
+ACTION IMPACT:
+
+TERMINATE → Loss of compute availability and SLA protection
+DOWNSIZE → Reduced redundancy increases outage risk
+SECURE → Prevents SLA exclusion due to misuse or violations
+SCALE → Multi-zone scaling improves uptime and SLA compliance
+
+CONSTRAINT TAGS:
+[TAG: SLA]
+[TAG: COMPUTE]
+[TAG: DISTRIBUTED_SYSTEM_RISK]

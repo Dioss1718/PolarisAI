@@ -1,0 +1,258 @@
+{
+  "compliance_rules": ["SOC2", "ISO27001", "PCI-DSS"],
+
+  "state_vector": {
+    "R_t": "resource_config_state",
+    "C_t": "cost_metrics",
+    "N_t": "network_topology",
+    "I_t": "iam_graph",
+    "L_t": "log_signals"
+  },
+
+  "nodes": [
+    {
+      "id": "aws_vm1",
+      "type": "COMPUTE",
+      "name": "AWS EC2 Instance",
+      "cloud_provider": "AWS",
+      "region": "ap-south-1",
+      "account_id": "aws-prod-001",
+      "environment": "PROD",
+      "cost": 150,
+      "cost_model": "ON_DEMAND",
+      "utilization": 20,
+      "exposure": "PUBLIC",
+      "criticality": 9,
+      "compliance_flags": ["IAM_OVERPRIVILEGED"],
+      "encryption_at_rest": false,
+      "backup_enabled": false,
+
+      "metrics": {
+        "cpu_usage_trend": "LOW",
+        "network_traffic": "HIGH"
+      },
+
+      "activity_logs": [
+        "High inbound traffic detected",
+        "Unusual outbound data flow"
+      ]
+    },
+
+    {
+      "id": "aws_iam_admin",
+      "type": "IAM_ROLE",
+      "name": "AWS Admin Role",
+      "cloud_provider": "AWS",
+      "region": "global",
+      "account_id": "aws-prod-001",
+      "environment": "PROD",
+      "cost": 0,
+      "cost_model": "N/A",
+      "utilization": 95,
+      "exposure": "INTERNAL",
+      "criticality": 10,
+      "compliance_flags": ["ADMIN_ACCESS"],
+
+      "iam_policies": ["FullAccess", "S3ReadWrite"],
+
+      "activity_logs": [
+        "Admin privileges used",
+        "Sensitive resource accessed"
+      ]
+    },
+
+    {
+      "id": "aws_iam_readonly",
+      "type": "IAM_ROLE",
+      "name": "ReadOnly Role",
+      "cloud_provider": "AWS",
+      "region": "global",
+      "account_id": "aws-prod-001",
+      "environment": "DEV",
+      "cost": 0,
+      "cost_model": "N/A",
+      "utilization": 40,
+      "exposure": "INTERNAL",
+      "criticality": 5,
+      "compliance_flags": [],
+
+      "iam_policies": ["ReadOnlyAccess"]
+    },
+
+    {
+      "id": "aws_db1",
+      "type": "DATABASE",
+      "name": "AWS RDS",
+      "cloud_provider": "AWS",
+      "region": "ap-south-1",
+      "account_id": "aws-prod-001",
+      "environment": "PROD",
+      "cost": 220,
+      "cost_model": "RESERVED",
+      "utilization": 75,
+      "exposure": "PRIVATE",
+      "criticality": 10,
+      "compliance_flags": [],
+      "encryption_at_rest": false,
+      "backup_enabled": false,
+
+      "activity_logs": [
+        "Sensitive query executed",
+        "Connection from IAM role"
+      ]
+    },
+
+    {
+      "id": "azure_vm1",
+      "type": "COMPUTE",
+      "name": "Azure VM",
+      "cloud_provider": "AZURE",
+      "region": "central-india",
+      "account_id": "azure-prod-01",
+      "environment": "PROD",
+      "cost": 130,
+      "cost_model": "ON_DEMAND",
+      "utilization": 15,
+      "exposure": "PUBLIC",
+      "criticality": 8,
+      "compliance_flags": ["OPEN_PORT"],
+      "encryption_at_rest": false,
+      "backup_enabled": false,
+
+      "metrics": {
+        "cpu_usage_trend": "IDLE",
+        "network_traffic": "LOW"
+      }
+    },
+
+    {
+      "id": "azure_storage1",
+      "type": "OBJECT_STORAGE",
+      "name": "Azure Blob",
+      "cloud_provider": "AZURE",
+      "region": "central-india",
+      "account_id": "azure-prod-01",
+      "environment": "DEV",
+      "cost": 40,
+      "cost_model": "ON_DEMAND",
+      "utilization": 12,
+      "exposure": "PUBLIC",
+      "criticality": 6,
+      "compliance_flags": ["PUBLIC_BUCKET"],
+      "encryption_at_rest": false,
+      "backup_enabled": false
+    },
+
+    {
+      "id": "gcp_lb1",
+      "type": "LOAD_BALANCER",
+      "name": "GCP Load Balancer",
+      "cloud_provider": "GCP",
+      "region": "asia-south1",
+      "account_id": "gcp-prod-01",
+      "environment": "PROD",
+      "cost": 60,
+      "cost_model": "ON_DEMAND",
+      "utilization": 65,
+      "exposure": "PUBLIC",
+      "criticality": 7,
+      "compliance_flags": [],
+      "encryption_at_rest": true,
+      "backup_enabled": true
+    },
+
+    {
+      "id": "gcp_storage1",
+      "type": "OBJECT_STORAGE",
+      "name": "GCP Storage",
+      "cloud_provider": "GCP",
+      "region": "asia-south1",
+      "account_id": "gcp-prod-01",
+      "environment": "PROD",
+      "cost": 35,
+      "cost_model": "ON_DEMAND",
+      "utilization": 20,
+      "exposure": "PRIVATE",
+      "criticality": 7,
+      "compliance_flags": [],
+      "encryption_at_rest": true,
+      "backup_enabled": true
+    },
+
+    {
+      "id": "sg1",
+      "type": "SECURITY_GROUP",
+      "name": "Open Security Group",
+      "cloud_provider": "AWS",
+      "region": "ap-south-1",
+      "account_id": "aws-prod-001",
+      "environment": "PROD",
+      "cost": 0,
+      "cost_model": "N/A",
+      "utilization": 0,
+      "exposure": "PUBLIC",
+      "criticality": 8,
+      "compliance_flags": ["PORT_0_0_0_0"]
+    }
+  ],
+
+  "edges": [
+    {
+      "from": "gcp_lb1",
+      "to": "aws_vm1",
+      "type": "TRAFFIC_TO",
+      "weight": 1
+    },
+    {
+      "from": "aws_vm1",
+      "to": "aws_iam_readonly",
+      "type": "ASSUMES_ROLE",
+      "weight": 2
+    },
+    {
+      "from": "aws_iam_readonly",
+      "to": "aws_iam_admin",
+      "type": "PRIVILEGE_ESCALATION",
+      "weight": 4
+    },
+    {
+      "from": "aws_iam_admin",
+      "to": "aws_db1",
+      "type": "ACCESS",
+      "weight": 5
+    },
+    {
+      "from": "aws_vm1",
+      "to": "azure_storage1",
+      "type": "DEPENDS_ON",
+      "weight": 2
+    },
+    {
+      "from": "azure_vm1",
+      "to": "gcp_storage1",
+      "type": "DEPENDS_ON",
+      "weight": 2
+    },
+    {
+      "from": "sg1",
+      "to": "aws_vm1",
+      "type": "EXPOSES",
+      "weight": 3
+    }
+  ],
+
+  "logs": {
+    "api_logs": [
+      "CreateInstance API called",
+      "DeleteBucket API attempt failed"
+    ],
+    "iam_logs": [
+      "Role escalation detected",
+      "Policy attached to admin role"
+    ],
+    "cost_logs": [
+      "Unexpected cost spike in AWS",
+      "Idle resource detected in Azure"
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+TITLE: Scalability Patterns
+
+DESCRIPTION:
+Systems must handle increasing workloads efficiently.
+
+RULES:
+- Use horizontal scaling when possible.
+- Implement auto-scaling policies.
+- Design stateless services.
+
+RISKS:
+- System overload under high traffic.
+- Performance degradation.
+
+REMEDIATIONS:
+- Add more instances dynamically.
+- Use load balancing.
+- Optimize resource allocation.
+
+CONSTRAINTS:
+- Critical services must support scaling.
+- Traffic spikes must be handled automatically.
+
+SIGNAL KEYWORDS:
+scaling, auto-scale, load, traffic, performance

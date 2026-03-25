@@ -1,0 +1,106 @@
+SERVICE: Google Cloud Storage
+TYPE: STORAGE
+
+UPTIME GUARANTEE:
+
+Multi-region / Dual-region Standard storage: ≥99.95%
+Regional Standard + Multi-region Nearline/Coldline/Archive: ≥99.9% (≥99.5% in Mexico/Stockholm)
+Regional Nearline/Coldline/Archive + Durable Reduced Availability: ≥99.0%
+Turbo Replication:
+Replication Time Conformance ≥99.0%
+Replication Volume Conformance ≥99.9%
+Uptime measured via Error Rates over 5-minute intervals
+
+FAILURE CONDITIONS:
+
+Failure defined as elevated Error Rate (HTTP 5xx responses)
+Error Rate = failed valid requests / total valid requests
+Requests must follow exponential back-off rules to be considered valid
+Turbo replication failure:
+Replication delay >15 minutes (Bad RPO Minute)
+Objects not replicated within 15 minutes
+Downtime derived from Error Rate averages across time intervals
+
+SERVICE CREDITS:
+
+Multi-region Standard (excluding Mexico/Stockholm):
+
+99.0% – <99.95% → 10%
+95.0% – <99.0% → 25%
+<95.0% → 50%
+
+Regional Standard + Multi-region Nearline/Coldline/Archive:
+
+99.0% – <99.9% → 10%
+95.0% – <99.0% → 25%
+<95.0% → 50%
+
+Regional Nearline/Coldline/Archive + Durable Reduced Availability:
+
+98.0% – <99.0% → 10%
+95.0% – <98.0% → 25%
+<95.0% → 50%
+
+Mexico & Stockholm adjusted thresholds apply (lower SLA for some classes)
+
+Turbo Replication:
+
+Moderate degradation → 10%
+Significant degradation → 25%
+Severe degradation → 50%
+Only highest applicable credit is granted (no stacking)
+Max credit capped at 50% of monthly bill
+Credits applied to future usage only
+Claims must be submitted within 30 days
+
+IMPORTANT RULES:
+
+SLA applies per project, region, and storage class
+Must follow request back-off requirements for eligibility
+Logs and proof of downtime required for claims
+Credits are sole remedy for SLA violations
+Google validates all claims
+
+Exclusions:
+
+Pre-GA or excluded features
+Force majeure events
+Customer or third-party system failures
+Abuse or violation of agreement
+Quota limitations or throttling
+
+ARCHITECTURE BEST PRACTICES:
+
+Use multi-region or dual-region storage for critical workloads
+Avoid regional or reduced availability classes for high availability needs
+Enable turbo replication for low RPO requirements
+Implement retry logic with exponential back-off
+Monitor error rates and replication metrics
+Design for redundancy across regions
+
+SECURITY / COMPLIANCE NOTES:
+
+Customer responsible for request patterns and retry logic
+Logs required for SLA validation must be maintained
+Shared responsibility model applies
+Improper request handling invalidates SLA claims
+
+RISK IMPLICATION:
+
+Lower storage classes have reduced availability guarantees
+Improper retry behavior invalidates SLA eligibility
+Replication delays introduce data consistency risks
+Regional limitations reduce availability guarantees
+Compensation capped at 50% → financial risk remains
+
+ACTION IMPACT:
+
+TERMINATE → Loss of data access and SLA protection
+DOWNSIZE → Moving to lower storage class increases availability risk
+SECURE → Ensures valid request patterns and compliance with SLA
+SCALE → Multi-region scaling improves availability and resilience
+
+CONSTRAINT TAGS:
+[TAG: SLA]
+[TAG: STORAGE]
+[TAG: DATA_DURABILITY_RISK]

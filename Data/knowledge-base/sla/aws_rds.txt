@@ -1,0 +1,90 @@
+SERVICE: Amazon RDS (Relational Database Service)
+TYPE: DATABASE
+
+UPTIME GUARANTEE:
+
+Multi-AZ DB Instance / Multi-AZ DB Cluster: ≥99.95% monthly uptime
+Single-DB Instance: ≥99.5% monthly uptime
+Uptime measured per 1-minute intervals over monthly billing cycle
+
+FAILURE CONDITIONS:
+
+Service considered unavailable when all connection requests fail during a 1-minute interval
+Applies to:
+Multi-AZ DB Instance
+Multi-AZ DB Cluster
+Single-DB Instance
+Downtime calculated as percentage of failed connection intervals
+
+SERVICE CREDITS:
+
+Multi-AZ SLA:
+
+<99.95% and ≥99.0% → 10% credit
+<99.0% and ≥95.0% → 25% credit
+<95.0% → 100% credit
+
+Single-DB SLA:
+
+<99.5% and ≥99.0% → 10% credit
+<99.0% and ≥95.0% → 25% credit
+<95.0% → 100% credit
+Credits apply only to future RDS payments
+No refunds; minimum credit must exceed $1
+Claims must be submitted within 2 billing cycles
+Multi-AZ and Single-DB claims cannot be combined
+
+IMPORTANT RULES:
+
+SLA applies per DB instance or cluster and per region
+Multi-AZ deployment required for higher availability guarantee (99.95%)
+Must submit logs, timestamps, DB instance IDs, and regions for claims
+Credits are the sole remedy for service failures
+AWS validation required for claim approval
+
+Exclusions:
+
+Force majeure events
+Network/internet issues outside AWS boundary
+Customer actions or misconfigurations
+Use of Micro DB instance class or similar limited-resource instances
+Not following operational best practices (e.g., overloading DB, excessive tables)
+Database engine failures causing crashes
+Insufficient I/O capacity causing long recovery times
+Customer-owned infrastructure or software issues
+Account suspension or termination by AWS
+
+ARCHITECTURE BEST PRACTICES:
+
+Use Multi-AZ deployments for production workloads
+Avoid Single-DB instances for high availability systems
+Provision adequate IOPS and storage for workload demands
+Implement connection retry and failover logic
+Monitor database health and performance metrics
+Follow RDS operational guidelines to avoid exclusion conditions
+Avoid resource overloading and excessive schema complexity
+
+SECURITY / COMPLIANCE NOTES:
+
+Logs required for SLA claims must redact sensitive data
+Customer responsible for proper database configuration and monitoring
+Shared responsibility model applies to database performance and availability
+
+RISK IMPLICATION:
+
+Single-DB deployments have lower availability and higher downtime risk
+Misconfiguration or poor capacity planning voids SLA eligibility
+Engine-level failures and performance bottlenecks are not covered
+Financial compensation limited to service credits only
+
+ACTION IMPACT:
+
+TERMINATE → Loss of database availability and SLA coverage
+DOWNSIZE → Increased risk of performance degradation and SLA violation
+SECURE → Reduces risk of misconfiguration-related exclusions
+SCALE → Improves availability and performance, supports SLA compliance
+
+CONSTRAINT TAGS:
+[TAG: SLA]
+[TAG: DATABASE]
+[TAG: AVAILABILITY_RISK]

@@ -1,0 +1,25 @@
+TITLE: Network Security Policies
+
+DESCRIPTION:
+Network security ensures safe communication between cloud resources.
+
+RULES:
+- No resource should be publicly exposed unless necessary.
+- Use private subnets for databases and internal services.
+- Restrict inbound traffic using security groups/firewalls.
+
+RISKS:
+- Public exposure increases attack surface.
+- Open ports can lead to unauthorized access.
+
+REMEDIATIONS:
+- Restrict security groups to known IP ranges.
+- Use VPN or bastion hosts for secure access.
+- Disable unused ports.
+
+CONSTRAINTS:
+- DATABASE resources must not be PUBLIC.
+- Load balancers should act as controlled entry points.
+
+SIGNAL KEYWORDS:
+network, firewall, port, exposure, public, private

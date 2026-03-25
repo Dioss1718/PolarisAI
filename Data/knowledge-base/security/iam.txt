@@ -1,0 +1,27 @@
+TITLE: IAM Security Best Practices
+
+DESCRIPTION:
+Identity and Access Management (IAM) controls access to cloud resources.
+
+RULES:
+- Always follow the principle of least privilege.
+- Do not assign admin roles unless absolutely necessary.
+- Use role-based access instead of user-based permissions.
+- Rotate credentials periodically.
+- Avoid long-lived access keys.
+
+RISKS:
+- Overprivileged IAM roles can lead to privilege escalation.
+- Compromised credentials can expose entire infrastructure.
+
+REMEDIATIONS:
+- Restrict IAM roles to minimum required permissions.
+- Enable MFA for all privileged accounts.
+- Audit IAM policies regularly.
+
+CONSTRAINTS:
+- IAM_ADMIN should not be assigned to application services.
+- PUBLIC access roles must be restricted.
+
+SIGNAL KEYWORDS:
+iam, role, privilege, access, identity, policy

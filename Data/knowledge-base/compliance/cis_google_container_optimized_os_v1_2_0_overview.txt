@@ -1,0 +1,35 @@
+TITLE: CIS Google Container-Optimized OS Benchmark v1.2.0 Overview
+
+DESCRIPTION:
+Security hardening benchmark for Google Container-Optimized OS focused on server-oriented baseline and defense-in-depth controls.
+Recommendations are organized into Level 1 and Level 2 - Server profiles and include both automated and manual validation patterns, with notable platform-specific immutability constraints.
+
+RULES:
+- Use Level 1 - Server as the practical baseline hardening profile.
+- Treat Level 2 - Server as a stricter extension where security requirements outweigh usability or performance concerns.
+- Validate recommendations using the benchmark’s stated audit commands and expected outputs.
+- Reapply runtime configuration changes after every boot when persistence is not supported.
+- Prefer image-based remediation when root filesystem or boot-level controls cannot be persistently modified.
+- Preserve host-only versus router/network role assumptions when applying network parameter controls.
+
+RISKS:
+- Assuming Linux persistence behavior may create false compliance because /etc is stateless on Container-Optimized OS.
+- Applying sysctl or banner changes only once may result in drift after reboot.
+- Attempting unsupported persistent remediations may fail due to read-only or immutable platform behavior.
+- Using host-only network controls on systems acting as routers can cause functional misconfiguration.
+
+REMEDIATIONS:
+- Encode per-control runtime remediation steps separately from persistence limitations.
+- Use startup automation or boot-time orchestration for controls that must be re-applied after reboot.
+- Use OS image updates when the benchmark states remediation requires an updated image.
+- Classify controls by mutable runtime setting versus immutable image/rootfs dependency.
+
+CONSTRAINTS:
+- /etc is stateless on Container-Optimized OS; changes there cannot be relied on for persistence across reboots for affected controls.
+- Root filesystem is read-only for relevant platform behaviors and some remediations require an OS image update instead of in-place modification.
+- Level 2 - Server extends Level 1 - Server and is not standalone.
+- Some network recommendations are explicitly intended for host-only systems and should not be applied without validating routing role.
+- Do not assume generic Linux hardening persistence semantics apply to this platform.
+
+SIGNAL KEYWORDS:
+cis benchmark, container optimized os, cos, google cos, level 1 server, level 2 server, immutable os, stateless etc, read only rootfs, boot time remediation, dm verity, sysctl reapply, host only network controls

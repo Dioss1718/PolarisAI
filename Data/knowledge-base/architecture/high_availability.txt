@@ -1,0 +1,25 @@
+TITLE: High Availability Architecture
+
+DESCRIPTION:
+Systems must remain operational with minimal downtime.
+
+RULES:
+- Deploy resources across multiple availability zones.
+- Use load balancers for traffic distribution.
+- Avoid single points of failure.
+
+RISKS:
+- Single node failure can cause system outage.
+- Downtime affects SLA commitments.
+
+REMEDIATIONS:
+- Use redundant instances.
+- Configure auto-recovery mechanisms.
+- Implement health checks.
+
+CONSTRAINTS:
+- Critical services must have redundancy.
+- Production systems must avoid single-instance deployment.
+
+SIGNAL KEYWORDS:
+availability, uptime, redundancy, load balancer, failover

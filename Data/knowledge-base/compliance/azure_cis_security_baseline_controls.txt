@@ -1,0 +1,58 @@
+TITLE: Azure CIS Security Baseline Controls
+DESCRIPTION:
+
+Consolidated security configuration baseline derived from CIS Microsoft Azure Benchmarks across storage, compute, database, and foundational services.
+Defines enforceable controls for identity, networking, encryption, logging, and access management in Azure environments.
+
+RULES:
+Enforce HTTPS/TLS 1.2 or higher for all services and communications
+Disable public network access unless explicitly required
+Use private endpoints and virtual networks for service access
+Enforce deny-by-default network access rules
+Require multi-factor authentication (MFA) for all users, especially privileged accounts
+Use Microsoft Entra ID (Azure AD) for authentication, avoid local/auth key-based access
+Encrypt all critical data using Customer-Managed Keys (CMK) where applicable
+Enable soft delete, versioning, and immutability for storage and backup services
+Ensure logging and diagnostic settings are enabled across all services
+Store secrets in Azure Key Vault, not in application code or configs
+Rotate and manage keys, secrets, and access tokens regularly
+Restrict anonymous and public access to storage and services
+Apply resource locks on critical resources
+Use least privilege (RBAC) for all role assignments
+Ensure private DNS + network integration when using private endpoints
+Enable Defender for Cloud and security monitoring services
+RISKS:
+Data exposure due to public endpoints or anonymous access
+Credential compromise from lack of MFA or key mismanagement
+Data loss without soft delete, backups, or immutability
+Unauthorized access due to over-permissive network/firewall rules
+Compliance failure due to missing logs or audit trails
+Lateral movement risk from flat or improperly segmented networks
+Encryption gaps leading to data leakage at rest or in transit
+Privilege escalation due to excessive role assignments
+Token misuse from long-lived SAS tokens or unmanaged secrets
+REMEDIATIONS:
+Enforce Azure Policies to automate compliance with CIS controls
+Replace public access with Private Link / Private Endpoints
+Enable MFA and Conditional Access policies for all users
+Migrate secrets to Azure Key Vault with rotation policies
+Configure diagnostic logs → Log Analytics / SIEM
+Implement network segmentation using VNets and NSGs
+Enable soft delete, backups, and geo-redundancy
+Disable legacy authentication and access keys
+Apply CMK encryption for sensitive workloads
+Periodically review RBAC roles and access assignments
+Enforce short-lived tokens (e.g., SAS expiry ≤ 1 hour)
+CONSTRAINTS:
+All recommendations (Automated + Manual) must be addressed for full compliance
+Benchmarks must match the correct Azure service and version
+Exceptions must be:
+Documented
+Risk-assessed
+Approved and tracked for audit
+Security controls must align with organizational policy and regulatory requirements
+Some services require specific configurations (e.g., TLS ≥1.2, MFA mandatory)
+Use of outdated benchmark versions can result in invalid compliance results
+SIGNAL KEYWORDS:
+
+azure, cis benchmark, cloud security, encryption, cmk, private endpoint, mfa, tls 1.2, logging, key vault, rbac, network security, azure policy, defender for cloud, storage security, database security, compute security
