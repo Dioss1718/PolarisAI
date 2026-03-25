@@ -237,7 +237,8 @@ func main() {
 			scores.Blast,
 		)
 	}
-	// ==============================
+
+// ==============================
 // STEP 9: GITOPS INTEGRATION
 // ==============================
 
@@ -259,6 +260,7 @@ for _, v := range validated {
 	})
 }
 
+gitops.RunGitOps(g, decisionsGitops)
 
 	// ==============================
 	// FINAL SUMMARY
