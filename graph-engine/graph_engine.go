@@ -1,4 +1,5 @@
-package main
+
+	package main
 
 import (
 	"encoding/json"
@@ -11,23 +12,26 @@ import (
 	candidategenerator "github.com/diya-suryawanshi/cloud/agents/candidate-generator"
 	costoptimizer "github.com/diya-suryawanshi/cloud/agents/cost-optimizer"
 	negotiation "github.com/diya-suryawanshi/cloud/agents/pareto-optimizer"
+	policyvalidator "github.com/diya-suryawanshi/cloud/agents/policy-validator"
 	securitysentinel "github.com/diya-suryawanshi/cloud/agents/security-sentinel"
 	riskengine "github.com/diya-suryawanshi/cloud/agents/security-sentinel/risk-engine"
 	"github.com/diya-suryawanshi/cloud/graph-engine/builder"
 	"github.com/diya-suryawanshi/cloud/graph-engine/services"
+	gitops "github.com/diya-suryawanshi/cloud/gitops"
 )
 
 func main() {
 	fmt.Println("Starting Unified Cloud Graph Engine")
 	startTime := time.Now()
 
-	// STEP 1: Fetch Simulation Data
+	// ==============================
+	// STEP 1: Fetch Data
+	// ==============================
 	data, err := services.FetchSimulationData()
 	if err != nil {
 		log.Fatalf("Failed to fetch simulation data: %v", err)
 	}
 
-	// STEP 2: Convert struct → map
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		log.Fatalf("Failed to marshal data: %v", err)
@@ -38,7 +42,9 @@ func main() {
 		log.Fatalf("Failed to unmarshal data: %v", err)
 	}
 
-	// STEP 3: Build Graph
+	// ==============================
+	// STEP 2: Build Graph
+	// ==============================
 	g := builder.BuildGraph(parsed)
 
 	fmt.Println("Graph successfully built")
@@ -46,9 +52,8 @@ func main() {
 	fmt.Printf("Edges: %d\n", len(g.Edges))
 
 	// ==============================
-	// STEP 4 & 5: PARALLEL EXECUTION
+	// STEP 3: PARALLEL EXECUTION
 	// ==============================
-
 	var (
 		attackPaths [][]string
 		nodeRisks   map[string]float64
@@ -58,7 +63,7 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Security Sentinel
+	// 🔐 Security Sentinel
 	go func() {
 		defer wg.Done()
 
@@ -79,7 +84,7 @@ func main() {
 		}
 	}()
 
-	// Cost Optimizer
+	// 💰 Cost Optimizer
 	go func() {
 		defer wg.Done()
 
@@ -96,16 +101,15 @@ func main() {
 	wg.Wait()
 
 	// ==============================
-	// STEP 6: CANDIDATE GENERATOR
+	// STEP 4: CANDIDATE GENERATOR
 	// ==============================
-
 	fmt.Println("\nRunning Candidate Generator")
 
 	candidates := candidategenerator.GenerateCandidates(g, signals, nodeRisks)
 
 	for _, c := range candidates {
 		fmt.Printf(
-			"Node: %-20s | Candidate: %-12s | BaseCost: %.2f | BaseRisk: %.2f | Centrality: %.2f | Priority: %.2f\n",
+			"Node: %-20s | Candidate: %-12s | Cost: %.2f | Risk: %.2f | Centrality: %.2f | Priority: %.2f\n",
 			c.NodeID,
 			c.ActionType,
 			c.BaseCost,
@@ -116,30 +120,27 @@ func main() {
 	}
 
 	// ==============================
-	// STEP 7: ACTION GENERATOR
+	// STEP 5: ACTION GENERATOR
 	// ==============================
-
 	fmt.Println("\nRunning Action Generator")
 
 	actions := actiongenerator.GenerateActions(g, candidates)
 
 	for _, a := range actions {
 		fmt.Printf(
-			"Node: %-20s | Action: %-12s | Variant: %-10s | CostDelta: %.2f | RiskReduction: %.2f | Disruption: %.2f | Score: %.2f\n",
+			"Node: %-20s | Action: %-12s | Variant: %-10s | CostDelta: %.2f | RiskReduction: %.2f | Score: %.2f\n",
 			a.NodeID,
 			a.ActionType,
 			a.Variant,
 			a.CostDelta,
 			a.RiskReduction,
-			a.Disruption,
 			a.Score,
 		)
 	}
 
 	// ==============================
-	// STEP 8: CONVERT → PARETO ACTION
+	// STEP 6: CONVERT → PARETO
 	// ==============================
-
 	var paretoActions []negotiation.Action
 
 	for _, a := range actions {
@@ -153,9 +154,8 @@ func main() {
 	}
 
 	// ==============================
-	// STEP 9: PARETO OPTIMIZER
+	// STEP 7: PARETO OPTIMIZER
 	// ==============================
-
 	fmt.Println("\nRunning Pareto Optimizer")
 
 	decisions := negotiation.RunParetoOptimizer(g, paretoActions)
@@ -171,9 +171,98 @@ func main() {
 	}
 
 	// ==============================
+	// STEP 8: POLICY VALIDATOR (FIXED)
+	// ==============================
+	fmt.Println("\nRunning Policy Validator")
+
+	policy := policyvalidator.Policy{
+		MaxDowntime:        2.0,
+		NoTerminateProd:    true,
+		NoPublicDB:         true,
+		EncryptionRequired: true,
+	}
+
+	for _, d := range decisions {
+
+		node := g.Nodes[d.NodeID]
+
+		// Compute centrality (same logic as elsewhere)
+		centrality := float64(len(g.Adjacency[d.NodeID])) / 5.0
+
+		// Get risk
+		risk := nodeRisks[d.NodeID]
+
+		input := policyvalidator.InputDecision{
+			NodeID:        d.NodeID,
+			Action:        d.Action,
+			CostDelta:     0, // optional for now
+			RiskReduction: 0, // optional for now
+		}
+
+		scores := policyvalidator.ValidateAll(
+			input,
+			policy,
+			node.Environment,
+			node.Type,
+			node.Exposure,
+			centrality,
+			risk,
+		)
+
+		// 🔥 FINAL DECISION LOGIC (IMPORTANT)
+		finalScore :=
+			0.3*scores.SLA +
+				0.3*scores.Security +
+				0.2*scores.Compliance +
+				0.2*scores.Blast
+
+		status := "APPROVED"
+		if finalScore < 0.5 {
+			status = "REJECTED"
+		}
+
+		fmt.Printf(
+			"Node: %-20s | Action: %-20s | Status: %-10s | Score: %.2f\n",
+			d.NodeID,
+			d.Action,
+			status,
+			finalScore,
+		)
+
+		fmt.Printf(
+			"SLA: %.2f | Security: %.2f | Compliance: %.2f | Blast: %.2f\n",
+			scores.SLA,
+			scores.Security,
+			scores.Compliance,
+			scores.Blast,
+		)
+	}
+	// ==============================
+// STEP 9: GITOPS INTEGRATION
+// ==============================
+
+validated := policyvalidator.RunPolicyValidator(g, []policyvalidator.InputDecision{}, nodeRisks)
+
+var decisionsGitops []gitops.Decision
+
+for _, v := range validated {
+	if v.Status == "REJECTED" {
+		continue
+	}
+
+	decisionsGitops = append(decisionsGitops, gitops.Decision{
+		NodeID:      v.NodeID,
+		Action:      v.Action,
+		FinalAction: v.FinalAction,
+		Score:       v.Score,
+		Reason:      v.Reason,
+	})
+}
+
+
+	// ==============================
 	// FINAL SUMMARY
 	// ==============================
-
 	fmt.Println("\nExecution Summary")
 	fmt.Printf("Total Time    : %v\n", time.Since(startTime))
 	fmt.Printf("Attack Paths  : %d\n", len(attackPaths))
