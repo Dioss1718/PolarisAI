@@ -1,7 +1,7 @@
 
 # Terraform Infra
 # Node: azure_vm1
-# Time: 1774442904
+# Time: 1774456713
 
 
 resource "null_resource" "azure_vm1" {
