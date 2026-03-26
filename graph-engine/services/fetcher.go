@@ -2,29 +2,43 @@ package services
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type SimulationResponse struct {
-	Nodes []map[string]interface{} `json:"nodes"`
-	Edges []map[string]interface{} `json:"edges"`
+	Nodes              []map[string]interface{} `json:"nodes"`
+	Edges              []map[string]interface{} `json:"edges"`
+	ExpectedIssues     []map[string]interface{} `json:"expected_issues,omitempty"`
+	Events             []map[string]interface{} `json:"events,omitempty"`
+	SimulationMetadata map[string]interface{}   `json:"simulation_metadata,omitempty"`
 }
 
-func FetchSimulationData() (*SimulationResponse, error) {
-	url := "http://localhost:7000/simulate/run"
+func FetchSimulationData(scenario string, seed int) (*SimulationResponse, error) {
+	baseURL := "http://localhost:7000/simulate/run"
 
-	resp, err := http.Get(url)
+	params := url.Values{}
+	if scenario != "" {
+		params.Set("scenario", scenario)
+	}
+	if seed != 0 {
+		params.Set("seed", fmt.Sprintf("%d", seed))
+	}
+
+	fullURL := baseURL
+	if encoded := params.Encode(); encoded != "" {
+		fullURL = baseURL + "?" + encoded
+	}
+
+	resp, err := http.Get(fullURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
-
 	var data SimulationResponse
-	err = json.Unmarshal(body, &data)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, err
 	}
 
