@@ -1,10 +1,45 @@
 package feedback
 
-import pareto "github.com/diya-suryawanshi/cloud/agents/pareto-optimizer"
+import (
+	"encoding/json"
+	"os"
+)
 
-func UpdateWeights(w pareto.Weights, s Summary) pareto.Weights {
+type Weights struct {
+	RiskWeight float64 `json:"risk_weight"`
+	CostWeight float64 `json:"cost_weight"`
+	Penalty    float64 `json:"penalty"`
+}
 
-	if s.AvgReward > 0.7 {
+const weightsFile = "backend/feedback/weights.json"
+
+func LoadWeights() Weights {
+
+	data, err := os.ReadFile(weightsFile)
+	if err != nil {
+		return Weights{
+			RiskWeight: 0.5,
+			CostWeight: 0.5,
+			Penalty:    0.7,
+		}
+	}
+
+	var w Weights
+	json.Unmarshal(data, &w)
+
+	return w
+}
+
+func SaveWeights(w Weights) {
+	data, _ := json.MarshalIndent(w, "", "  ")
+	os.WriteFile(weightsFile, data, 0644)
+}
+
+func UpdateWeights(s Summary) Weights {
+
+	w := LoadWeights()
+
+	if s.AvgReward > 0.75 {
 		w.RiskWeight += 0.05
 		w.CostWeight -= 0.02
 		w.Penalty -= 0.02
@@ -17,6 +52,8 @@ func UpdateWeights(w pareto.Weights, s Summary) pareto.Weights {
 	total := w.RiskWeight + w.CostWeight
 	w.RiskWeight /= total
 	w.CostWeight /= total
+
+	SaveWeights(w)
 
 	return w
 }
