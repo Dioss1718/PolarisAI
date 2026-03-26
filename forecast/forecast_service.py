@@ -1,7 +1,6 @@
 import os
 import pickle
 from flask import Flask, jsonify, request
-import pandas as pd
 
 app = Flask(__name__)
 
@@ -11,51 +10,92 @@ BILL_SHOCK_ABS = float(os.getenv("BILL_SHOCK_ABS", 300))
 
 
 def load_model(node_id):
-    path = f"{MODEL_DIR}/{node_id}.pkl"
+    path = os.path.join(MODEL_DIR, f"{node_id}.pkl")
     if not os.path.exists(path):
         return None, []
+
     with open(path, "rb") as f:
-        return pickle.load(f)
+        payload = pickle.load(f)
+
+    # Supported formats:
+    # 1. (model, regressors)
+    # 2. {"model": model, "regressors": [...]}
+    # 3. model only
+    if isinstance(payload, tuple) and len(payload) == 2:
+        model, regressors = payload
+        return model, regressors or []
+
+    if isinstance(payload, dict):
+        model = payload.get("model")
+        regressors = payload.get("regressors", [])
+        return model, regressors or []
+
+    return payload, []
 
 
 @app.route("/forecast")
 def forecast():
     node_id = request.args.get("node")
-    days = int(request.args.get("days", 90))
+    days_raw = request.args.get("days", "90")
 
     if not node_id:
         return jsonify({"error": "node param required"}), 400
 
-    model, regressors = load_model(node_id)
-    if not model:
+    try:
+        days = int(days_raw)
+        if days < 1:
+            return jsonify({"error": "days must be >= 1"}), 400
+    except ValueError:
+        return jsonify({"error": "days must be an integer"}), 400
+
+    try:
+        model, regressors = load_model(node_id)
+    except Exception as e:
+        return jsonify({"error": f"Failed to load model for {node_id}", "details": str(e)}), 500
+
+    if model is None:
         return jsonify({"error": f"No model for {node_id}"}), 404
 
-    future = model.make_future_dataframe(periods=days)
+    try:
+        future = model.make_future_dataframe(periods=days)
 
-    for reg in regressors:
-        future[reg] = float(request.args.get(reg, 0))
+        for reg in regressors:
+            future[reg] = float(request.args.get(reg, 0))
 
-    result = model.predict(future)
-    tail = result.tail(days)
+        result = model.predict(future)
+        tail = result.tail(days)
 
-    f30 = max(0.0, round(tail.iloc[min(29, len(tail)-1)]["yhat"], 2))
-    f90 = max(0.0, round(tail.iloc[-1]["yhat"], 2))
-    u90 = max(0.0, round(tail.iloc[-1]["yhat_upper"], 2))
-    l90 = max(0.0, round(tail.iloc[-1]["yhat_lower"], 2))
+        if tail.empty:
+            return jsonify({"error": f"Forecast output empty for {node_id}"}), 500
 
-    current = max(0.0, round(result.iloc[-(days+1)]["yhat"], 2))
+        idx30 = min(29, len(tail) - 1)
+
+        f30 = max(0.0, round(float(tail.iloc[idx30]["yhat"]), 2))
+        f90 = max(0.0, round(float(tail.iloc[-1]["yhat"]), 2))
+        u90 = max(0.0, round(float(tail.iloc[-1]["yhat_upper"]), 2))
+        l90 = max(0.0, round(float(tail.iloc[-1]["yhat_lower"]), 2))
+
+        hist_index = -(days + 1)
+        if abs(hist_index) <= len(result):
+            current = max(0.0, round(float(result.iloc[hist_index]["yhat"]), 2))
+        else:
+            current = max(0.0, round(float(result.iloc[0]["yhat"]), 2))
+
+    except Exception as e:
+        return jsonify({"error": f"Forecast computation failed for {node_id}", "details": str(e)}), 500
 
     shock = False
     reason = ""
 
     if current > 0 and f90 >= current:
-        pct = (u90 - current) / current * 100
+        pct = ((u90 - current) / current) * 100 if current > 0 else 0
+
         if pct >= BILL_SHOCK_PCT:
             shock = True
             reason = f"Projected increase {pct:.1f}% exceeds threshold"
         elif u90 >= BILL_SHOCK_ABS:
             shock = True
-            reason = "Upper forecast exceeds limit"
+            reason = "Upper forecast exceeds absolute threshold"
 
     return jsonify({
         "node": node_id,
