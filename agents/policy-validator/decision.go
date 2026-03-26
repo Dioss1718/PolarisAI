@@ -3,13 +3,20 @@ package policyvalidator
 func ComputeFinalDecision(
 	input InputDecision,
 	scores ValidationScores,
+	env string,
 ) ValidatedDecision {
 
-	// Adaptive weights (NOT static)
 	wSLA := 0.3
 	wSec := 0.3
 	wComp := 0.2
 	wBlast := 0.2
+
+	if env == "PROD" {
+		wSLA += 0.1
+		wBlast += 0.1
+		wSec -= 0.05
+		wComp -= 0.05
+	}
 
 	finalScore :=
 		wSLA*scores.SLA +

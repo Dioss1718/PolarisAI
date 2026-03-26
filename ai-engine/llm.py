@@ -1,9 +1,9 @@
-from groq import Groq
 import os
+from groq import Groq
 from config import LLM_MODEL
 
-# 🔥 Production-grade client
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
 
 def call_llm(prompt: str) -> str:
     try:
@@ -12,19 +12,17 @@ def call_llm(prompt: str) -> str:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a PRINCIPAL cloud architect AI. Be precise, grounded, and non-hallucinating."
+                    "content": "You are a principal cloud architect AI. Stay grounded, precise, and concise."
                 },
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2,  # low hallucination
+            temperature=0.2,
             max_tokens=800
         )
 
         output = completion.choices[0].message.content
-
         if not output or len(output.strip()) < 10:
             raise ValueError("Empty LLM response")
-
         return output
 
     except Exception as e:

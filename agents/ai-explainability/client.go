@@ -9,10 +9,6 @@ import (
 	"time"
 )
 
-// ==============================
-// REQUEST / RESPONSE STRUCTS
-// ==============================
-
 type AIRequest struct {
 	NodeID        string  `json:"node_id"`
 	Action        string  `json:"action"`
@@ -32,22 +28,13 @@ type AIResponse struct {
 	Sources     []string `json:"sources"`
 }
 
-// ==============================
-// CONFIG
-// ==============================
-
 var httpClient = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
 var explainURL = "http://localhost:8000/explain"
 
-// ==============================
-// MAIN FUNCTION
-// ==============================
-
 func GetExplanation(req AIRequest) (string, error) {
-
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		return "", fmt.Errorf("marshal error: %v", err)
@@ -57,7 +44,6 @@ func GetExplanation(req AIRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpClient.Do(httpReq)
@@ -76,8 +62,7 @@ func GetExplanation(req AIRequest) (string, error) {
 	}
 
 	var result AIResponse
-	err = json.Unmarshal(body, &result)
-	if err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("decode error: %v | raw: %s", err, string(body))
 	}
 

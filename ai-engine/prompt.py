@@ -1,18 +1,15 @@
 def build_prompt(input_data, docs):
-
     docs_text = "\n\n".join(docs)
 
     return f"""
 You are a PRINCIPAL CLOUD ARCHITECT.
 
-You MUST follow STRICT reasoning rules:
-
-1. Use POLICY SCORES as primary truth
-2. Use DOCUMENT EVIDENCE as justification
-3. DO NOT hallucinate
-4. If evidence missing → say "INSUFFICIENT DATA"
-
----
+Strict rules:
+1. Use POLICY SCORES as primary truth.
+2. Use DOCUMENT EVIDENCE as justification.
+3. Do not hallucinate unavailable facts.
+4. If evidence is weak, say INSUFFICIENT DATA.
+5. Be concise but concrete.
 
 DECISION INPUT:
 Node: {input_data['node_id']}
@@ -29,22 +26,13 @@ Security: {input_data['security']}
 Compliance: {input_data['compliance']}
 Blast Radius: {input_data['blast']}
 
----
-
 DOCUMENT EVIDENCE:
 {docs_text}
 
----
-
-OUTPUT FORMAT (STRICT):
-
+OUTPUT FORMAT:
 SUMMARY:
 RISK_REASON:
 COST_IMPACT:
 TRADE_OFF:
 RECOMMENDATION:
-
----
-
-Generate now:
 """
