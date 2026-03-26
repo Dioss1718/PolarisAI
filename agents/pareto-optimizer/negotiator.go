@@ -12,7 +12,6 @@ func RunNegotiation(
 	weights Weights,
 ) []Decision {
 
-	// Step 1: Filter valid actions
 	var valid []Action
 	for _, a := range actions {
 		if IsValid(g, a) {
@@ -24,15 +23,16 @@ func RunNegotiation(
 		return []Decision{}
 	}
 
-	// Step 2: Pareto front
 	pareto := FilterPareto(valid)
+	if len(pareto) == 0 {
+		return []Decision{}
+	}
 
 	minCost, maxCost, minRisk, maxRisk := ComputeBounds(pareto)
 
-	var decisions []Decision
+	bestByNode := make(map[string]Decision)
 
 	for _, a := range pareto {
-
 		penalty := ConstraintPenalty(g, a)
 
 		score := ScoreAction(
@@ -45,12 +45,22 @@ func RunNegotiation(
 			maxRisk,
 		)
 
-		decisions = append(decisions, Decision{
+		decision := Decision{
 			NodeID: a.NodeID,
 			Action: a.ActionType,
 			Score:  score,
 			Reason: GenerateExplanation(a, score, penalty),
-		})
+		}
+
+		existing, ok := bestByNode[a.NodeID]
+		if !ok || decision.Score > existing.Score {
+			bestByNode[a.NodeID] = decision
+		}
+	}
+
+	var decisions []Decision
+	for _, d := range bestByNode {
+		decisions = append(decisions, d)
 	}
 
 	sort.Slice(decisions, func(i, j int) bool {

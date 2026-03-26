@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	forecast "github.com/diya-suryawanshi/cloud/Forecast"
 	actiongenerator "github.com/diya-suryawanshi/cloud/agents/action-generator"
 	aiexplain "github.com/diya-suryawanshi/cloud/agents/ai-explainability"
 	candidategenerator "github.com/diya-suryawanshi/cloud/agents/candidate-generator"
@@ -17,6 +16,7 @@ import (
 	riskengine "github.com/diya-suryawanshi/cloud/agents/security-sentinel/risk-engine"
 	feedback "github.com/diya-suryawanshi/cloud/backend/feedback"
 	pluginpkg "github.com/diya-suryawanshi/cloud/backend/plugin"
+	forecast "github.com/diya-suryawanshi/cloud/forecast"
 	gitops "github.com/diya-suryawanshi/cloud/gitops"
 	"github.com/diya-suryawanshi/cloud/graph-engine/builder"
 	"github.com/diya-suryawanshi/cloud/graph-engine/services"
@@ -28,9 +28,6 @@ func Run() error {
 	fmt.Println("Starting Nexus-Ops Orchestrator")
 	startTime := time.Now()
 
-	// =========================================
-	// STEP 1: FETCH SYNTHETIC CLOUD STATE
-	// =========================================
 	PrintSection("Fetching Simulation Data")
 
 	data, err := services.FetchSimulationData(cfg.Scenario, cfg.Seed)
@@ -49,9 +46,6 @@ func Run() error {
 		fmt.Printf("Structured Events: %d\n", len(data.Events))
 	}
 
-	// =========================================
-	// STEP 2: BUILD GRAPH
-	// =========================================
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal simulation response: %w", err)
@@ -68,9 +62,6 @@ func Run() error {
 	fmt.Printf("Nodes: %d\n", len(g.Nodes))
 	fmt.Printf("Edges: %d\n", len(g.Edges))
 
-	// =========================================
-	// STEP 3: PARALLEL INTELLIGENCE ANALYSIS
-	// =========================================
 	var (
 		attackPaths [][]string
 		nodeRisks   map[string]float64
@@ -117,9 +108,6 @@ func Run() error {
 
 	wg.Wait()
 
-	// =========================================
-	// STEP 4: CANDIDATE GENERATION
-	// =========================================
 	PrintSection("Running Candidate Generator")
 
 	candidates := candidategenerator.GenerateCandidates(g, signals, nodeRisks)
@@ -136,9 +124,6 @@ func Run() error {
 		)
 	}
 
-	// =========================================
-	// STEP 5: ACTION GENERATION
-	// =========================================
 	PrintSection("Running Action Generator")
 
 	actions := actiongenerator.GenerateActions(g, candidates)
@@ -155,7 +140,6 @@ func Run() error {
 		)
 	}
 
-	// Build lookup for later feedback integration
 	actionLookup := make(map[string]actiongenerator.Action)
 	var paretoActions []negotiation.Action
 
@@ -172,9 +156,6 @@ func Run() error {
 		})
 	}
 
-	// =========================================
-	// STEP 6: PARETO / NEGOTIATION (ADAPTIVE)
-	// =========================================
 	PrintSection("Running Pareto Optimizer")
 
 	learnedWeights := feedback.LoadWeights()
@@ -189,7 +170,11 @@ func Run() error {
 		},
 	)
 
+	decisionLookup := make(map[string]negotiation.Decision)
+
 	for _, d := range decisions {
+		decisionLookup[d.NodeID+"|"+d.Action] = d
+
 		fmt.Printf(
 			"Node: %-20s | Final Action: %-20s | Score: %.2f\n",
 			d.NodeID,
@@ -199,9 +184,6 @@ func Run() error {
 		fmt.Printf("Reason: %s\n", d.Reason)
 	}
 
-	// =========================================
-	// STEP 7: POLICY VALIDATION
-	// =========================================
 	PrintSection("Running Policy Validator")
 
 	policy := policyvalidator.Policy{
@@ -291,9 +273,6 @@ func Run() error {
 		}
 	}
 
-	// =========================================
-	// STEP 8: FORECAST
-	// =========================================
 	PrintSection("Running Forecast")
 
 	for _, d := range decisionsGitops {
@@ -313,13 +292,10 @@ func Run() error {
 		)
 	}
 
-	// =========================================
-	// STEP 9: AI EXPLAINABILITY
-	// =========================================
 	PrintSection("Running AI Explainability Layer")
 	aiStart := time.Now()
 
-	for _, d := range decisions {
+	for _, d := range decisionsGitops {
 		node := g.Nodes[d.NodeID]
 
 		inDegree := 0
@@ -340,7 +316,7 @@ func Run() error {
 
 		input := policyvalidator.InputDecision{
 			NodeID:        d.NodeID,
-			Action:        d.Action,
+			Action:        d.FinalAction,
 			CostDelta:     0,
 			RiskReduction: 0,
 		}
@@ -355,13 +331,18 @@ func Run() error {
 			risk,
 		)
 
+		originalDecisionScore := d.Score
+		if original, ok := decisionLookup[d.NodeID+"|"+d.Action]; ok {
+			originalDecisionScore = original.Score
+		}
+
 		req := aiexplain.AIRequest{
 			NodeID:        d.NodeID,
-			Action:        d.Action,
+			Action:        d.FinalAction,
 			Env:           node.Environment,
 			NodeType:      node.Type,
 			Cost:          0,
-			RiskReduction: d.Score,
+			RiskReduction: originalDecisionScore,
 			SLA:           scores.SLA,
 			Security:      scores.Security,
 			Compliance:    scores.Compliance,
@@ -373,7 +354,7 @@ func Run() error {
 		duration := time.Since(start)
 
 		fmt.Println("\n--- AI REPORT ---")
-		fmt.Printf("Node: %s | Action: %s\n", d.NodeID, d.Action)
+		fmt.Printf("Node: %s | Action: %s\n", d.NodeID, d.FinalAction)
 		fmt.Printf("Latency: %v\n", duration)
 
 		if err != nil {
@@ -385,14 +366,15 @@ func Run() error {
 
 	fmt.Printf("\nAI Layer Time: %v\n", time.Since(aiStart))
 
-	// =========================================
-	// STEP 10: GITOPS
-	// =========================================
 	PrintSection("Running GitOps")
 
 	var prs []gitops.PRResponse
 	if pluginpkg.GitOps != nil {
-		prs, _ = pluginpkg.GitOps.Run(g, decisionsGitops, nodeRisks)
+		var gitopsErr error
+		prs, gitopsErr = pluginpkg.GitOps.Run(g, decisionsGitops, nodeRisks)
+		if gitopsErr != nil {
+			fmt.Printf("GitOps skipped: %v\n", gitopsErr)
+		}
 	}
 
 	merged := false
@@ -416,9 +398,6 @@ func Run() error {
 		fmt.Println("No PR merged")
 	}
 
-	// =========================================
-	// STEP 11: FEEDBACK LEARNING LOOP
-	// =========================================
 	PrintSection("Running Feedback Learning Loop")
 
 	records := feedback.Load()
@@ -448,9 +427,6 @@ func Run() error {
 		newWeights.Penalty,
 	)
 
-	// =========================================
-	// STEP 12: FINAL OUTPUT
-	// =========================================
 	paths := securitysentinel.FindAttackPaths(g)
 
 	PrintSection("Final Graph Paths")

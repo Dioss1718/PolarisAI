@@ -1,16 +1,1 @@
-SERVICE: Google Cloud SQL
-TYPE: DATABASE
-
-UPTIME GUARANTEE:
-
-Cloud SQL Enterprise Plus (HA or read pool ≥2 nodes): ≥99.99%
-Cloud SQL Enterprise (HA): ≥99.95%
-Uptime calculated monthly per instance
-
-FAILURE CONDITIONS:
-
-Downtime occurs when all valid requests to:
-HA instance fail, or
-Read pool instance fail
-Downtime counted only if ≥1 consecutive minute
- of recovery increases downtime.\n\ng
+invalid type: string "SERVICE: Google Cloud SQL\nTYPE: DATABASE\n\nUPTIME GUARANTEE:\n\nCloud SQL Enterprise Plus (HA or read pool ≥2 nodes): ≥99.99%\nCloud SQL Enterprise (HA): ≥99.95%\nUptime calculated monthly per instance\n\nFAILURE CONDITIONS:\n\nDowntime occurs when all valid requests to:\nHA instance fail, or\nRead pool instance fail\nDowntime counted only if ≥1 consecutive minute\n

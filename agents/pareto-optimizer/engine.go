@@ -7,6 +7,5 @@ func RunParetoOptimizer(
 	actions []Action,
 	weights Weights,
 ) []Decision {
-
 	return RunNegotiation(g, actions, weights)
 }

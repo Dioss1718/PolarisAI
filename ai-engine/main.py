@@ -1,4 +1,6 @@
 from typing import List, Optional
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -6,7 +8,9 @@ from retriever import retrieve
 from prompt import build_prompt, build_gitops_prompt
 from llm import call_llm
 
-app = FastAPI()
+load_dotenv()
+
+app = FastAPI(title="Polaris AI Engine", version="1.0.0")
 
 
 class ExplainRequest(BaseModel):
@@ -74,7 +78,7 @@ def retrieve_docs(data: RetrieveRequest):
 
         return RetrieveResponse(
             documents=docs,
-            sources=sources
+            sources=sources,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -84,8 +88,10 @@ def retrieve_docs(data: RetrieveRequest):
 def explain(data: ExplainRequest):
     try:
         query = (
-            f"{data.action} for {data.node_type} in {data.env} "
-            f"cost impact security implications SLA compliance"
+            f"node {data.node_id} action {data.action} "
+            f"resource type {data.node_type} environment {data.env} "
+            f"SLA impact security implications compliance constraints cost tradeoff "
+            f"cloud provider specific guidance"
         )
 
         docs, metas = retrieve(query, data.node_type, data.action)
@@ -105,7 +111,7 @@ def explain(data: ExplainRequest):
         return ExplainResponse(
             explanation=output,
             grounded=len(docs) > 0,
-            sources=sources
+            sources=sources,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -121,7 +127,7 @@ def generate_infra(data: InfraRequest):
             raise ValueError("LLM returned weak infra output")
 
         return InfraResponse(
-            code=output,
+            code=output.strip(),
             format=data.format,
             title=f"Remediation for {data.node_id}",
             summary=f"{data.action} generated for {data.node_id}",
