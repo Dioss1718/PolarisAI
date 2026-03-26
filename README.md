@@ -101,21 +101,6 @@ Operator Command Space
 
 ---
 
-## Repository Structure
-
-backend/  
-frontend/  
-README.md  
-.env.example  
-
----
-
-## Demo
-
-Add your demo video link here
-
----
-
 ## Summary
 
 PolarisAI combines graph intelligence, multi-objective optimization, explainable AI, and GitOps execution to create a complete autonomous cloud governance system. It enables organizations to move from reactive monitoring to proactive, policy-aware, and self-improving infrastructure management.
