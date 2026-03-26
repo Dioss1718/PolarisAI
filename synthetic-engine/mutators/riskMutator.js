@@ -1,6 +1,8 @@
 const { HIGH_RISK_EXPOSURE } = require("../config/rules");
+const { logEvent } = require("../utils/eventLogger");
+const { computeSeverity } = require("../utils/severity");
 
-function applyRiskMutation(data) {
+function applyRiskMutation(data, random) {
   data.nodes.forEach(node => {
     node.compliance_flags = node.compliance_flags || [];
     node.activity_logs = node.activity_logs || [];
@@ -10,9 +12,17 @@ function applyRiskMutation(data) {
         node.compliance_flags.push(HIGH_RISK_EXPOSURE);
       }
 
-      if (!node.activity_logs.includes("Public exposure risk detected")) {
-        node.activity_logs.push("Public exposure risk detected");
+      const message = "Public exposure risk detected";
+      if (!node.activity_logs.includes(message)) {
+        node.activity_logs.push(message);
       }
+
+      logEvent(data, {
+        type: "SECURITY_EXPOSURE",
+        node_id: node.id,
+        reason: "Public exposure increases attack surface",
+        severity: computeSeverity(node)
+      });
     }
   });
 
