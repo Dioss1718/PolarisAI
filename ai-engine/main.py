@@ -5,7 +5,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from retriever import retrieve
-from prompt import build_prompt, build_gitops_prompt
+from prompt import build_prompt
+from gitops_prompt import build_gitops_prompt
 from llm import call_llm
 
 load_dotenv()
@@ -78,7 +79,7 @@ def retrieve_docs(data: RetrieveRequest):
 
         return RetrieveResponse(
             documents=docs,
-            sources=sources,
+            sources=sources
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -88,10 +89,12 @@ def retrieve_docs(data: RetrieveRequest):
 def explain(data: ExplainRequest):
     try:
         query = (
-            f"node {data.node_id} action {data.action} "
-            f"resource type {data.node_type} environment {data.env} "
-            f"SLA impact security implications compliance constraints cost tradeoff "
-            f"cloud provider specific guidance"
+            f"node {data.node_id} "
+            f"action {data.action} "
+            f"resource type {data.node_type} "
+            f"environment {data.env} "
+            f"sla impact security implications compliance constraints "
+            f"cost tradeoff allowed actions terminate downsize secure"
         )
 
         docs, metas = retrieve(query, data.node_type, data.action)
@@ -101,6 +104,12 @@ def explain(data: ExplainRequest):
         if not output or len(output.strip()) < 20:
             raise ValueError("LLM returned weak output")
 
+        # Hard post-filter for forbidden action words in recommendation text
+        forbidden = ["SCALE", "MIGRATE", "REDEPLOY", "RESTART"]
+        fixed_output = output
+        for word in forbidden:
+            fixed_output = fixed_output.replace(word, "SECURE")
+
         sources = []
         for meta in metas:
             source = meta.get("source")
@@ -109,9 +118,9 @@ def explain(data: ExplainRequest):
                 sources.append(f"{category}/{source}")
 
         return ExplainResponse(
-            explanation=output,
+            explanation=fixed_output,
             grounded=len(docs) > 0,
-            sources=sources,
+            sources=sources
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
