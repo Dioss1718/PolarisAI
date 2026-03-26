@@ -16,9 +16,9 @@ import (
 	securitysentinel "github.com/diya-suryawanshi/cloud/agents/security-sentinel"
 	riskengine "github.com/diya-suryawanshi/cloud/agents/security-sentinel/risk-engine"
 	feedback "github.com/diya-suryawanshi/cloud/backend/feedback"
+	pluginpkg "github.com/diya-suryawanshi/cloud/backend/plugin"
 	gitops "github.com/diya-suryawanshi/cloud/gitops"
 	"github.com/diya-suryawanshi/cloud/graph-engine/builder"
-	pluginpkg "github.com/diya-suryawanshi/cloud/graph-engine/plugin"
 	"github.com/diya-suryawanshi/cloud/graph-engine/services"
 )
 

@@ -4,50 +4,51 @@ import (
 	modelspkg "github.com/diya-suryawanshi/cloud/graph-engine/models"
 )
 
-// This function applies a single decision on the current graph
 func GenerateProposedGraph(current *Graph, d Decision) *Graph {
-
-	// First we clone the original graph so that we do not modify it directly
 	newGraph := CloneGraph(current)
 
-	// Get the node on which decision needs to be applied
 	node, ok := newGraph.Nodes[d.NodeID]
-
-	// If node does not exist, simply return the graph as it is
 	if !ok {
 		return newGraph
 	}
 
-	// Apply action based on decision type
 	switch d.FinalAction {
-
-	// If action is terminate, we remove exposure completely
 	case "TERMINATE_SAFE", "TERMINATE_FORCE":
-		node.Exposure = "none"
+		// Keep graph values valid for downstream modules
+		node.Exposure = "PRIVATE"
+		node.Utilization = 0
+		node.Cost = 0
 
-	// If action is downsize, we reduce utilization
-	case "DOWNSIZE_SMALL", "DOWNSIZE_MEDIUM":
-		node.Utilization = node.Utilization * 0.7
+	case "DOWNSIZE_SMALL":
+		node.Utilization = node.Utilization * 0.85
+		node.Cost = node.Cost * 0.85
 
-	// If action is secure, we reduce exposure and mark compliance
-	case "SECURE_PATCH", "SECURE_RESTRICT":
-		node.Exposure = "low"
-		node.Compliance = append(node.Compliance, "secured")
+	case "DOWNSIZE_MEDIUM":
+		node.Utilization = node.Utilization * 0.70
+		node.Cost = node.Cost * 0.70
+
+	case "DOWNSIZE_AGGRESSIVE":
+		node.Utilization = node.Utilization * 0.55
+		node.Cost = node.Cost * 0.55
+
+	case "SECURE_PATCH":
+		node.Exposure = "INTERNAL"
+		node.Compliance = appendIfMissing(node.Compliance, "PATCHED")
+		node.Cost = node.Cost * 1.05
+
+	case "SECURE_RESTRICT":
+		node.Exposure = "PRIVATE"
+		node.Compliance = appendIfMissing(node.Compliance, "ACCESS_RESTRICTED")
+		node.Cost = node.Cost * 1.03
 	}
 
-	// Update the modified node back into graph
 	newGraph.Nodes[d.NodeID] = node
-
 	return newGraph
 }
 
-// This function applies multiple decisions one by one on the graph
 func GenerateFullProposedGraph(current *Graph, decisions []Decision) *Graph {
-
-	// Clone original graph
 	newGraph := CloneGraph(current)
 
-	// Apply each decision sequentially
 	for _, d := range decisions {
 		newGraph = GenerateProposedGraph(newGraph, d)
 	}
@@ -55,20 +56,33 @@ func GenerateFullProposedGraph(current *Graph, decisions []Decision) *Graph {
 	return newGraph
 }
 
-// This function creates a copy of the graph
 func CloneGraph(g *Graph) *Graph {
-
-	// Creating new graph structure
 	newGraph := &Graph{
 		Nodes:     make(map[string]modelspkg.Node),
-		Edges:     g.Edges,
-		Adjacency: g.Adjacency,
+		Edges:     make([]modelspkg.Edge, len(g.Edges)),
+		Adjacency: make(map[string][]modelspkg.Edge),
 	}
 
-	// Copy all nodes from original graph to new graph
+	copy(newGraph.Edges, g.Edges)
+
 	for k, v := range g.Nodes {
 		newGraph.Nodes[k] = v
 	}
 
+	for k, edges := range g.Adjacency {
+		cloned := make([]modelspkg.Edge, len(edges))
+		copy(cloned, edges)
+		newGraph.Adjacency[k] = cloned
+	}
+
 	return newGraph
+}
+
+func appendIfMissing(items []string, value string) []string {
+	for _, v := range items {
+		if v == value {
+			return items
+		}
+	}
+	return append(items, value)
 }

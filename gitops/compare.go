@@ -1,14 +1,11 @@
 package gitops
 
-// This function compares old graph and new graph for a specific node
-// and returns the differences between them
-func CompareGraphs(old *Graph, new *Graph, nodeID string) Diff {
+import "fmt"
 
-	// Get node from old and new graph
+func CompareGraphs(old *Graph, new *Graph, nodeID string) Diff {
 	oldNode, ok1 := old.Nodes[nodeID]
 	newNode, ok2 := new.Nodes[nodeID]
 
-	// Initialize diff structure
 	diff := Diff{
 		NodeID:    nodeID,
 		OldState:  map[string]interface{}{},
@@ -16,56 +13,55 @@ func CompareGraphs(old *Graph, new *Graph, nodeID string) Diff {
 		ChangeSet: []string{},
 	}
 
-	// Safety check: if node not present in either graph, return empty diff
 	if !ok1 || !ok2 {
+		if !ok1 {
+			diff.ChangeSet = append(diff.ChangeSet, "Node missing in old graph")
+		}
+		if !ok2 {
+			diff.ChangeSet = append(diff.ChangeSet, "Node missing in new graph")
+		}
 		return diff
 	}
 
-	// Check if exposure value changed
 	if oldNode.Exposure != newNode.Exposure {
-		diff.ChangeSet = append(diff.ChangeSet, "Exposure changed")
+		diff.ChangeSet = append(diff.ChangeSet,
+			fmt.Sprintf("Exposure changed: %s -> %s", oldNode.Exposure, newNode.Exposure))
 	}
 
-	// Check if node type changed
 	if oldNode.Type != newNode.Type {
-		diff.ChangeSet = append(diff.ChangeSet, "Type changed")
+		diff.ChangeSet = append(diff.ChangeSet,
+			fmt.Sprintf("Type changed: %s -> %s", oldNode.Type, newNode.Type))
 	}
 
-	// Check if utilization changed
 	if oldNode.Utilization != newNode.Utilization {
-		diff.ChangeSet = append(diff.ChangeSet, "Utilization changed")
+		diff.ChangeSet = append(diff.ChangeSet,
+			fmt.Sprintf("Utilization changed: %.2f -> %.2f", oldNode.Utilization, newNode.Utilization))
 	}
 
-	// Check if compliance list changed (deep comparison)
+	if oldNode.Cost != newNode.Cost {
+		diff.ChangeSet = append(diff.ChangeSet,
+			fmt.Sprintf("Cost changed: %.2f -> %.2f", oldNode.Cost, newNode.Cost))
+	}
+
 	if !equalStringSlices(oldNode.Compliance, newNode.Compliance) {
 		diff.ChangeSet = append(diff.ChangeSet, "Compliance updated")
 	}
 
-	// Store old and new node state for reference
 	diff.OldState["node"] = oldNode
 	diff.NewState["node"] = newNode
 
 	return diff
 }
 
-// This helper function checks if two string slices are equal
-// It compares elements instead of just length
 func equalStringSlices(a, b []string) bool {
-
-	// If length different, they are not equal
 	if len(a) != len(b) {
 		return false
 	}
 
-	// Create map to count occurrences
 	m := make(map[string]int)
-
-	// Count elements of first slice
 	for _, v := range a {
 		m[v]++
 	}
-
-	// Reduce count using second slice
 	for _, v := range b {
 		if m[v] == 0 {
 			return false
@@ -73,6 +69,5 @@ func equalStringSlices(a, b []string) bool {
 		m[v]--
 	}
 
-	// If all matched, slices are equal
 	return true
 }

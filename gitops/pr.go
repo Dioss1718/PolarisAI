@@ -12,104 +12,44 @@ import (
 	"time"
 )
 
-// This function creates a Pull Request on GitHub using generated infra code
-func CreatePR(code InfraCode, d Decision, currentGraph *Graph) PRResponse {
+var githubHTTPClient = &http.Client{
+	Timeout: 12 * time.Second,
+}
 
-	// Get GitHub credentials from environment
+func CreatePR(code InfraCode, d Decision, currentGraph *Graph) PRResponse {
 	token := os.Getenv("GITHUB_TOKEN")
 	repo := os.Getenv("GITHUB_REPO")
 
-	// If credentials missing, return failure
 	if token == "" || repo == "" {
-		log.Println("Missing ENV variables")
+		log.Println("Missing GITHUB_TOKEN or GITHUB_REPO")
 		return PRResponse{Status: "FAILED"}
 	}
 
-	// Ensure that some code is always present
 	if code.Content == "" {
-		code.Content = `
-resource "null_resource" "` + d.NodeID + `" {
-  provisioner "local-exec" {
-    command = "echo default infra applied"
-  }
-}
-`
+		code = fallbackInfraCode(d)
 	}
 
-	// Create a unique branch name using nodeID and timestamp
 	branch := fmt.Sprintf("polaris/%s-%d", d.NodeID, time.Now().Unix())
 
-	// STEP 1: Get latest SHA of main branch
-	url := "https://api.github.com/repos/" + repo + "/git/ref/heads/main"
-
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Println("GitHub API error:", err)
+	baseSHA, err := getMainBranchSHA(repo, token)
+	if err != nil || baseSHA == "" {
+		log.Println("Failed to fetch main branch SHA:", err)
 		return PRResponse{Status: "FAILED"}
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-
-	var result map[string]interface{}
-	json.Unmarshal(body, &result)
-
-	// Extract base SHA from response
-	object := result["object"].(map[string]interface{})
-	baseSHA := object["sha"].(string)
-
-	// STEP 2: Create new branch from main
-	branchPayload := map[string]string{
-		"ref": "refs/heads/" + branch,
-		"sha": baseSHA,
+	if err := createBranch(repo, token, branch, baseSHA); err != nil {
+		log.Println("Branch creation failed:", err)
+		return PRResponse{Status: "FAILED"}
 	}
-
-	bBody, _ := json.Marshal(branchPayload)
-
-	req2, _ := http.NewRequest(
-		"POST",
-		"https://api.github.com/repos/"+repo+"/git/refs",
-		bytes.NewBuffer(bBody),
-	)
-
-	req2.Header.Set("Authorization", "Bearer "+token)
-	req2.Header.Set("Content-Type", "application/json")
-
-	http.DefaultClient.Do(req2)
-
-	log.Println("Branch created:", branch)
-
-	// STEP 3: Create or update Terraform file in repo
 
 	filePath := "infra/" + d.NodeID + ".tf"
 
-	// Check if file already exists
-	getURL := fmt.Sprintf(
-		"https://api.github.com/repos/%s/contents/%s?ref=%s",
-		repo, filePath, branch,
-	)
-
-	reqCheck, _ := http.NewRequest("GET", getURL, nil)
-	reqCheck.Header.Set("Authorization", "Bearer "+token)
-
-	respCheck, _ := http.DefaultClient.Do(reqCheck)
-
-	var fileSHA string
-
-	// If file exists, get its SHA for update
-	if respCheck.StatusCode == 200 {
-		var existing map[string]interface{}
-		bodyCheck, _ := io.ReadAll(respCheck.Body)
-		json.Unmarshal(bodyCheck, &existing)
-		fileSHA = existing["sha"].(string)
+	fileSHA, err := getExistingFileSHA(repo, token, filePath, branch)
+	if err != nil {
+		log.Println("File lookup failed:", err)
+		return PRResponse{Status: "FAILED"}
 	}
-	respCheck.Body.Close()
 
-	// Prepare Terraform file content
 	fileContent := fmt.Sprintf(`
 # Terraform Infra
 # Node: %s
@@ -118,50 +58,162 @@ resource "null_resource" "` + d.NodeID + `" {
 %s
 `, d.NodeID, time.Now().Unix(), code.Content)
 
-	// Encode file content to base64
 	content := base64.StdEncoding.EncodeToString([]byte(fileContent))
 
-	// Create payload for file commit
 	filePayload := map[string]interface{}{
 		"message": "PolarisAI update " + d.NodeID,
 		"content": content,
 		"branch":  branch,
 	}
 
-	// If updating existing file, include SHA
 	if fileSHA != "" {
 		filePayload["sha"] = fileSHA
 	}
 
-	fBody, _ := json.Marshal(filePayload)
+	if err := putFile(repo, token, filePath, filePayload); err != nil {
+		log.Println("File commit failed:", err)
+		return PRResponse{Status: "FAILED"}
+	}
 
-	req3, _ := http.NewRequest(
-		"PUT",
-		"https://api.github.com/repos/"+repo+"/contents/"+filePath,
-		bytes.NewBuffer(fBody),
+	prNumber, prURL, err := createPullRequest(repo, token, d, branch)
+	if err != nil {
+		log.Println("PR creation failed:", err)
+		return PRResponse{Status: "FAILED"}
+	}
+
+	log.Printf("[GitOps] PR created for Node=%s | PR #%d", d.NodeID, prNumber)
+
+	return PRResponse{
+		URL:      prURL,
+		Status:   "CREATED",
+		PRNumber: prNumber,
+		Branch:   branch,
+	}
+}
+
+func getMainBranchSHA(repo, token string) (string, error) {
+	url := "https://api.github.com/repos/" + repo + "/git/ref/heads/main"
+
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := githubHTTPClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("github ref fetch failed: %s", string(body))
+	}
+
+	var result struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	return result.Object.SHA, nil
+}
+
+func createBranch(repo, token, branch, baseSHA string) error {
+	payload := map[string]string{
+		"ref": "refs/heads/" + branch,
+		"sha": baseSHA,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest(
+		"POST",
+		"https://api.github.com/repos/"+repo+"/git/refs",
+		bytes.NewBuffer(body),
 	)
 
-	req3.Header.Set("Authorization", "Bearer "+token)
-	req3.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
 
-	resp3, err := http.DefaultClient.Do(req3)
+	resp, err := githubHTTPClient.Do(req)
 	if err != nil {
-		log.Println("File commit error:", err)
-		return PRResponse{Status: "FAILED"}
+		return err
 	}
-	defer resp3.Body.Close()
+	defer resp.Body.Close()
 
-	// If commit failed, return error
-	if resp3.StatusCode >= 300 {
-		bodyErr, _ := io.ReadAll(resp3.Body)
-		log.Println("File commit failed:", string(bodyErr))
-		return PRResponse{Status: "FAILED"}
+	if resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("branch creation failed: %s", string(b))
 	}
 
-	log.Println("File committed successfully")
+	return nil
+}
 
-	// STEP 4: Create Pull Request
-	prPayload := map[string]string{
+func getExistingFileSHA(repo, token, filePath, branch string) (string, error) {
+	url := fmt.Sprintf(
+		"https://api.github.com/repos/%s/contents/%s?ref=%s",
+		repo, filePath, branch,
+	)
+
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := githubHTTPClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return "", nil
+	}
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("file lookup failed: %s", string(body))
+	}
+
+	var existing struct {
+		SHA string `json:"sha"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&existing); err != nil {
+		return "", err
+	}
+
+	return existing.SHA, nil
+}
+
+func putFile(repo, token, filePath string, payload map[string]interface{}) error {
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest(
+		"PUT",
+		"https://api.github.com/repos/"+repo+"/contents/"+filePath,
+		bytes.NewBuffer(body),
+	)
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := githubHTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("file commit failed: %s", string(b))
+	}
+
+	return nil
+}
+
+func createPullRequest(repo, token string, d Decision, branch string) (int, string, error) {
+	payload := map[string]string{
 		"title": "PolarisAI Fix: " + d.NodeID,
 		"body": fmt.Sprintf(
 			"Node: %s\nAction: %s -> %s\nScore: %.2f\nReason: %s",
@@ -175,47 +227,36 @@ resource "null_resource" "` + d.NodeID + `" {
 		"base": "main",
 	}
 
-	prBody, _ := json.Marshal(prPayload)
+	body, _ := json.Marshal(payload)
 
-	req4, _ := http.NewRequest(
+	req, _ := http.NewRequest(
 		"POST",
 		"https://api.github.com/repos/"+repo+"/pulls",
-		bytes.NewBuffer(prBody),
+		bytes.NewBuffer(body),
 	)
 
-	req4.Header.Set("Authorization", "Bearer "+token)
-	req4.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
 
-	prResp, err := http.DefaultClient.Do(req4)
+	resp, err := githubHTTPClient.Do(req)
 	if err != nil {
-		log.Println("PR request failed:", err)
-		return PRResponse{Status: "FAILED"}
+		return 0, "", err
 	}
-	defer prResp.Body.Close()
+	defer resp.Body.Close()
 
-	body4, _ := io.ReadAll(prResp.Body)
-
-	// If PR not created successfully
-	if prResp.StatusCode != 201 {
-		log.Println("PR creation failed:", string(body4))
-		return PRResponse{Status: "FAILED"}
+	if resp.StatusCode != 201 {
+		b, _ := io.ReadAll(resp.Body)
+		return 0, "", fmt.Errorf("pr creation failed: %s", string(b))
 	}
 
-	// Extract PR number
-	var prResult map[string]interface{}
-	json.Unmarshal(body4, &prResult)
-
-	prNumber := int(prResult["number"].(float64))
-
-	log.Println("PR CREATED:", prNumber)
-
-	fmt.Printf("\nOpen PR: https://github.com/%s/pull/%d\n", repo, prNumber)
-
-	// Return PR response
-	return PRResponse{
-		URL:      fmt.Sprintf("https://github.com/%s/pull/%d", repo, prNumber),
-		Status:   "CREATED",
-		PRNumber: prNumber,
-		Branch:   branch,
+	var result struct {
+		Number  int    `json:"number"`
+		HTMLURL string `json:"html_url"`
 	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, "", err
+	}
+
+	return result.Number, result.HTMLURL, nil
 }

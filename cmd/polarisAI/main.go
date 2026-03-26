@@ -6,8 +6,8 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/diya-suryawanshi/cloud/backend/orchestrator"
+	pluginpkg "github.com/diya-suryawanshi/cloud/backend/plugin"
 	gitops "github.com/diya-suryawanshi/cloud/gitops"
-	pluginpkg "github.com/diya-suryawanshi/cloud/graph-engine/plugin"
 )
 
 func main() {

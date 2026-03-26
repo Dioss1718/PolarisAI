@@ -8,7 +8,7 @@ func (p *Plugin) Run(
 	nodeRisks map[string]float64,
 ) ([]PRResponse, error) {
 
-	current := graph.(*Graph) // type cast
+	current := graph.(*Graph)
 
 	_, prs := RunGitOps(current, decisions, nodeRisks)
 

@@ -3,51 +3,94 @@ package gitops
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
-	"os"
+	"time"
 )
 
-// This function generates infrastructure code based on the diff and decision
-func GenerateInfraCode(diff Diff, d Decision) InfraCode {
+type infraRequest struct {
+	NodeID  string   `json:"node_id"`
+	Action  string   `json:"action"`
+	Reason  string   `json:"reason"`
+	Changes []string `json:"changes"`
+	Format  string   `json:"format"`
+}
 
-	// Prepare payload to send to GenAI API
-	payload := map[string]interface{}{
-		"node":    d.NodeID,
-		"changes": diff.ChangeSet,
-		"reason":  d.Reason,
+type infraResponse struct {
+	Code     string `json:"code"`
+	Format   string `json:"format"`
+	Title    string `json:"title,omitempty"`
+	Summary  string `json:"summary,omitempty"`
+	Grounded bool   `json:"grounded,omitempty"`
+}
+
+var infraHTTPClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
+
+func GenerateInfraCode(diff Diff, d Decision) InfraCode {
+	reqBody := infraRequest{
+		NodeID:  d.NodeID,
+		Action:  d.FinalAction,
+		Reason:  d.Reason,
+		Changes: diff.ChangeSet,
+		Format:  "terraform",
 	}
 
-	// Convert payload into JSON format
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fallbackInfraCode(d)
+	}
 
-	// Create HTTP POST request to GenAI endpoint
-	req, _ := http.NewRequest(
-		"POST",
-		os.Getenv("GENAI_ENDPOINT"),
+	resp, err := infraHTTPClient.Post(
+		"http://localhost:8000/infra",
+		"application/json",
 		bytes.NewBuffer(body),
 	)
-
-	// Add authorization and content type headers
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("GENAI_API_KEY"))
-	req.Header.Set("Content-Type", "application/json")
-
-	// Create HTTP client and send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
-	// If request fails, return empty infra code with default format
 	if err != nil {
-		return InfraCode{Content: "", Format: "terraform"}
+		return fallbackInfraCode(d)
 	}
 	defer resp.Body.Close()
 
-	// Decode response from API
-	var result map[string]string
-	json.NewDecoder(resp.Body).Decode(&result)
+	if resp.StatusCode >= 300 {
+		return fallbackInfraCode(d)
+	}
 
-	// Return generated code and its format
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fallbackInfraCode(d)
+	}
+
+	var out infraResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return fallbackInfraCode(d)
+	}
+
+	if out.Code == "" {
+		return fallbackInfraCode(d)
+	}
+
+	format := out.Format
+	if format == "" {
+		format = "terraform"
+	}
+
 	return InfraCode{
-		Content: result["code"],
-		Format:  "terraform",
+		Content: out.Code,
+		Format:  format,
+	}
+}
+
+func fallbackInfraCode(d Decision) InfraCode {
+	return InfraCode{
+		Content: fmt.Sprintf(`
+resource "null_resource" "%s" {
+  provisioner "local-exec" {
+    command = "echo applied %s"
+  }
+}
+`, d.NodeID, d.FinalAction),
+		Format: "terraform",
 	}
 }

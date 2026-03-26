@@ -1,9 +1,9 @@
-from typing import List
+from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from retriever import retrieve
-from prompt import build_prompt
+from prompt import build_prompt, build_gitops_prompt
 from llm import call_llm
 
 app = FastAPI()
@@ -37,6 +37,22 @@ class RetrieveRequest(BaseModel):
 class RetrieveResponse(BaseModel):
     documents: List[str]
     sources: List[str]
+
+
+class InfraRequest(BaseModel):
+    node_id: str
+    action: str
+    reason: str
+    changes: List[str]
+    format: str = "terraform"
+
+
+class InfraResponse(BaseModel):
+    code: str
+    format: str
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    grounded: bool = True
 
 
 @app.get("/health")
@@ -90,6 +106,26 @@ def explain(data: ExplainRequest):
             explanation=output,
             grounded=len(docs) > 0,
             sources=sources
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/infra", response_model=InfraResponse)
+def generate_infra(data: InfraRequest):
+    try:
+        prompt = build_gitops_prompt(data.model_dump())
+        output = call_llm(prompt)
+
+        if not output or len(output.strip()) < 10:
+            raise ValueError("LLM returned weak infra output")
+
+        return InfraResponse(
+            code=output,
+            format=data.format,
+            title=f"Remediation for {data.node_id}",
+            summary=f"{data.action} generated for {data.node_id}",
+            grounded=True,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
