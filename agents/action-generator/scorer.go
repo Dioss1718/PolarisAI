@@ -3,14 +3,14 @@ package actiongenerator
 import "math"
 
 func Score(costDelta, riskReduction, disruption float64) float64 {
-	// Positive savings are better
+
 	costScore := -costDelta
 	riskScore := riskReduction
 
-	// Non-linear disruption penalty
+	//Non-linear disruption penalty
 	disruptionPenalty := math.Pow(disruption, 1.15)
 
-	// Confidence proxy: lower disruption → higher confidence
+	//Confidence proxy: lower disruption → higher confidence
 	confidence := 1.0 / (1.0 + disruption)
 
 	score :=

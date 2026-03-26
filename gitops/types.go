@@ -23,10 +23,13 @@ type InfraCode struct {
 }
 
 type PRResponse struct {
-	URL      string
-	Status   string
-	PRNumber int
-	Branch   string
+	URL      string `json:"url"`
+	Status   string `json:"status"`
+	PRNumber int    `json:"prNumber"`
+	Branch   string `json:"branch"`
+	NodeID   string `json:"nodeId"`
+	Action   string `json:"action"`
+	Message  string `json:"message"`
 }
 
 type Graph = graphpkg.Graph

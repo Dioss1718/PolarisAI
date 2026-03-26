@@ -2,8 +2,7 @@ package gitops
 
 import (
 	"fmt"
-
-	riskengine "github.com/diya-suryawanshi/cloud/agents/security-sentinel/risk-engine"
+	"log"
 )
 
 func RunGitOps(
@@ -22,6 +21,9 @@ func RunGitOps(
 		diff := CompareGraphs(current, proposed, d.NodeID)
 
 		fmt.Println("\nDIFF DETECTED:")
+		if len(diff.ChangeSet) == 0 {
+			fmt.Println(" - No material change detected")
+		}
 		for _, change := range diff.ChangeSet {
 			fmt.Println(" -", change)
 		}
@@ -29,38 +31,14 @@ func RunGitOps(
 		code := GenerateInfraCode(diff, d)
 		pr := CreatePR(code, d, current)
 
+		pr.NodeID = d.NodeID
+		pr.Action = d.FinalAction
+
 		responses = append(responses, pr)
 
-		if pr.PRNumber == 0 {
-			continue
+		if pr.PRNumber != 0 {
+			log.Printf("[GitOps] PR created for Node=%s | PR #%d", d.NodeID, pr.PRNumber)
 		}
-
-		fmt.Printf("\nWaiting for PR #%d (%s)\n", pr.PRNumber, pr.Branch)
-
-		merged := WaitForPRMerge(pr.PRNumber, pr.Branch)
-		if !merged {
-			fmt.Println("Merge not completed, skipping...")
-			continue
-		}
-
-		fmt.Println("\nApplying merged changes...")
-
-		newGraph := proposed
-
-		oldMetrics := EvaluateGraph(current, nodeRisks)
-		newNodeRisks := riskengine.ComputeNodeRisk(newGraph)
-		newMetrics := EvaluateGraph(newGraph, newNodeRisks)
-
-		fmt.Println("\nMetrics Comparison:")
-		fmt.Printf("Old Risk: %.2f\n", oldMetrics.TotalRisk)
-		fmt.Printf("New Risk: %.2f\n", newMetrics.TotalRisk)
-
-		finalGraph = SelectBestGraph(current, newGraph, newNodeRisks)
-
-		current = finalGraph
-		nodeRisks = newNodeRisks
-
-		fmt.Println("Graph updated after merge")
 	}
 
 	return finalGraph, responses

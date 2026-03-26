@@ -22,45 +22,44 @@ import (
 	"github.com/diya-suryawanshi/cloud/graph-engine/services"
 )
 
-func Run() error {
-	cfg := DefaultConfig()
-
-	fmt.Println("Starting Nexus-Ops Orchestrator")
+func Run(req RunRequest) (*PipelineResult, error) {
 	startTime := time.Now()
 
-	PrintSection("Fetching Simulation Data")
-
-	data, err := services.FetchSimulationData(cfg.Scenario, cfg.Seed)
-	if err != nil {
-		return fmt.Errorf("failed to fetch simulation data: %w", err)
+	scenario := req.Scenario
+	if scenario == "" {
+		scenario = "FULL_CHAOS"
 	}
-
-	if data.SimulationMetadata != nil {
-		fmt.Printf("Scenario: %v\n", data.SimulationMetadata["scenario"])
-		fmt.Printf("Seed: %v\n", data.SimulationMetadata["seed"])
-	}
-	if len(data.ExpectedIssues) > 0 {
-		fmt.Printf("Expected Issues: %d\n", len(data.ExpectedIssues))
-	}
-	if len(data.Events) > 0 {
-		fmt.Printf("Structured Events: %d\n", len(data.Events))
-	}
-
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("failed to marshal simulation response: %w", err)
+	seed := req.Seed
+	if seed == 0 {
+		seed = 42
 	}
 
 	var parsed map[string]interface{}
-	if err := json.Unmarshal(jsonData, &parsed); err != nil {
-		return fmt.Errorf("failed to unmarshal simulation response: %w", err)
+
+	if req.ManualData != nil {
+		parsed = req.ManualData
+	} else {
+		data, err := services.FetchSimulationData(scenario, seed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch simulation data: %w", err)
+		}
+
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal simulation response: %w", err)
+		}
+
+		if err := json.Unmarshal(jsonData, &parsed); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal simulation response: %w", err)
+		}
 	}
 
-	PrintSection("Building Unified Cloud Graph")
-
 	g := builder.BuildGraph(parsed)
-	fmt.Printf("Nodes: %d\n", len(g.Nodes))
-	fmt.Printf("Edges: %d\n", len(g.Edges))
+
+	stages := []PipelineStageDTO{
+		{Name: "Simulation", Status: "complete"},
+		{Name: "Graph", Status: "complete"},
+	}
 
 	var (
 		attackPaths [][]string
@@ -73,79 +72,33 @@ func Run() error {
 
 	go func() {
 		defer wg.Done()
-
-		PrintSection("Running Security Sentinel")
-
 		attackPaths = securitysentinel.FindAttackPaths(g)
-
-		for i, path := range attackPaths {
-			risk := riskengine.CalculatePathRisk(g, path)
-			fmt.Printf("Path %d | Risk: %.2f\n", i+1, risk)
-			fmt.Printf("-> %v\n", path)
-		}
-
 		nodeRisks = riskengine.ComputeNodeRisk(g)
-
-		for id, score := range nodeRisks {
-			fmt.Printf("Node: %-20s | Risk: %.2f\n", id, score)
-		}
 	}()
 
 	go func() {
 		defer wg.Done()
-
-		PrintSection("Running Cost Optimizer")
-
 		signals = costoptimizer.Run(g)
-
-		for _, s := range signals {
-			fmt.Printf(
-				"Node: %-20s | WasteRatio: %.2f | Score: %.2f | Confidence: %.2f\n",
-				s.NodeID, s.WasteRatio, s.Score, s.Confidence,
-			)
-		}
 	}()
 
 	wg.Wait()
-
-	PrintSection("Running Candidate Generator")
+	stages = append(stages,
+		PipelineStageDTO{Name: "Security Sentinel", Status: "complete"},
+		PipelineStageDTO{Name: "Cost Optimizer", Status: "complete"},
+	)
 
 	candidates := candidategenerator.GenerateCandidates(g, signals, nodeRisks)
-
-	for _, c := range candidates {
-		fmt.Printf(
-			"Node: %-20s | Candidate: %-16s | Cost: %.2f | Risk: %.2f | Centrality: %.2f | Priority: %.2f\n",
-			c.NodeID,
-			c.ActionType,
-			c.BaseCost,
-			c.BaseRisk,
-			c.Centrality,
-			c.PriorityScore,
-		)
-	}
-
-	PrintSection("Running Action Generator")
+	_ = candidates
+	stages = append(stages, PipelineStageDTO{Name: "Candidate Generator", Status: "complete"})
 
 	actions := actiongenerator.GenerateActions(g, candidates)
-
-	for _, a := range actions {
-		fmt.Printf(
-			"Node: %-20s | Action: %-16s | Variant: %-10s | CostDelta: %.2f | RiskReduction: %.2f | Score: %.2f\n",
-			a.NodeID,
-			a.ActionType,
-			a.Variant,
-			a.CostDelta,
-			a.RiskReduction,
-			a.Score,
-		)
-	}
+	stages = append(stages, PipelineStageDTO{Name: "Action Generator", Status: "complete"})
 
 	actionLookup := make(map[string]actiongenerator.Action)
 	var paretoActions []negotiation.Action
 
 	for _, a := range actions {
 		paretoActionName := a.ActionType + "_" + a.Variant
-
 		actionLookup[a.NodeID+"|"+paretoActionName] = a
 
 		paretoActions = append(paretoActions, negotiation.Action{
@@ -155,8 +108,6 @@ func Run() error {
 			RiskReduction: a.RiskReduction,
 		})
 	}
-
-	PrintSection("Running Pareto Optimizer")
 
 	learnedWeights := feedback.LoadWeights()
 
@@ -169,22 +120,7 @@ func Run() error {
 			Penalty:    learnedWeights.Penalty,
 		},
 	)
-
-	decisionLookup := make(map[string]negotiation.Decision)
-
-	for _, d := range decisions {
-		decisionLookup[d.NodeID+"|"+d.Action] = d
-
-		fmt.Printf(
-			"Node: %-20s | Final Action: %-20s | Score: %.2f\n",
-			d.NodeID,
-			d.Action,
-			d.Score,
-		)
-		fmt.Printf("Reason: %s\n", d.Reason)
-	}
-
-	PrintSection("Running Policy Validator")
+	stages = append(stages, PipelineStageDTO{Name: "Pareto Optimizer", Status: "complete"})
 
 	policy := policyvalidator.Policy{
 		MaxDowntime:        2.0,
@@ -193,8 +129,11 @@ func Run() error {
 		EncryptionRequired: true,
 	}
 
-	decisionsGitops := make([]gitops.Decision, 0)
-	approvedActions := make([]actiongenerator.Action, 0)
+	var recommendations []RecommendationDTO
+	var decisionsGitops []gitops.Decision
+	var approvedActions []actiongenerator.Action
+	var explanations []ExplanationDTO
+	var forecasts []ForecastDTO
 
 	for _, d := range decisions {
 		node := g.Nodes[d.NodeID]
@@ -248,13 +187,19 @@ func Run() error {
 			finalAction = "SAFE_" + d.Action
 		}
 
-		fmt.Printf(
-			"Node: %-20s | Action: %-20s | Status: %-10s | Score: %.2f\n",
-			d.NodeID,
-			finalAction,
-			status,
-			finalScore,
-		)
+		rec := RecommendationDTO{
+			NodeID:      d.NodeID,
+			Action:      d.Action,
+			FinalAction: finalAction,
+			Status:      status,
+			Score:       finalScore,
+			Reason:      d.Reason,
+			Risk:        risk,
+			Cloud:       node.Cloud,
+			Type:        node.Type,
+			Environment: node.Environment,
+		}
+		recommendations = append(recommendations, rec)
 
 		if status == "REJECTED" {
 			continue
@@ -271,137 +216,77 @@ func Run() error {
 		if srcAction, ok := actionLookup[d.NodeID+"|"+d.Action]; ok {
 			approvedActions = append(approvedActions, srcAction)
 		}
-	}
 
-	PrintSection("Running Forecast")
-
-	for _, d := range decisionsGitops {
-		res, err := forecast.Get(d.NodeID)
-		if err != nil {
-			fmt.Printf("Node: %-20s | Forecast Error: %v\n", d.NodeID, err)
-			continue
-		}
-
-		fmt.Printf(
-			"Node: %-20s | Current: %.2f | F30: %.2f | F90: %.2f | Shock: %v\n",
-			res.NodeID,
-			res.CurrentCost,
-			res.Forecast30,
-			res.Forecast90,
-			res.BillShock,
-		)
-	}
-
-	PrintSection("Running AI Explainability Layer")
-	aiStart := time.Now()
-
-	for _, d := range decisionsGitops {
-		node := g.Nodes[d.NodeID]
-
-		inDegree := 0
-		for _, edges := range g.Adjacency {
-			for _, e := range edges {
-				if e.To == d.NodeID {
-					inDegree++
-				}
-			}
-		}
-		outDegree := len(g.Adjacency[d.NodeID])
-		centrality := float64(inDegree*2+outDegree) / 10.0
-		if centrality > 1.0 {
-			centrality = 1.0
-		}
-
-		risk := nodeRisks[d.NodeID]
-
-		input := policyvalidator.InputDecision{
+		explainReq := aiexplain.AIRequest{
 			NodeID:        d.NodeID,
-			Action:        d.FinalAction,
-			CostDelta:     0,
-			RiskReduction: 0,
-		}
-
-		scores := policyvalidator.ValidateAll(
-			input,
-			policy,
-			node.Environment,
-			node.Type,
-			node.Exposure,
-			centrality,
-			risk,
-		)
-
-		originalDecisionScore := d.Score
-		if original, ok := decisionLookup[d.NodeID+"|"+d.Action]; ok {
-			originalDecisionScore = original.Score
-		}
-
-		req := aiexplain.AIRequest{
-			NodeID:        d.NodeID,
-			Action:        d.FinalAction,
+			Action:        finalAction,
 			Env:           node.Environment,
 			NodeType:      node.Type,
 			Cost:          0,
-			RiskReduction: originalDecisionScore,
+			RiskReduction: d.Score,
 			SLA:           scores.SLA,
 			Security:      scores.Security,
 			Compliance:    scores.Compliance,
 			Blast:         scores.Blast,
 		}
 
-		start := time.Now()
-		explanation, err := aiexplain.GetExplanation(req)
-		duration := time.Since(start)
+		explanation, err := aiexplain.GetExplanation(explainReq)
+		if err == nil {
+			explanations = append(explanations, ExplanationDTO{
+				NodeID:      d.NodeID,
+				Action:      finalAction,
+				Explanation: explanation,
+			})
+		}
 
-		fmt.Println("\n--- AI REPORT ---")
-		fmt.Printf("Node: %s | Action: %s\n", d.NodeID, d.FinalAction)
-		fmt.Printf("Latency: %v\n", duration)
-
-		if err != nil {
-			fmt.Println("AI Warning:", err)
-		} else {
-			fmt.Println(explanation)
+		if f, err := forecast.Get(d.NodeID); err == nil {
+			forecasts = append(forecasts, ForecastDTO{
+				NodeID:      f.NodeID,
+				CurrentCost: f.CurrentCost,
+				Forecast30:  f.Forecast30,
+				Forecast90:  f.Forecast90,
+				BillShock:   f.BillShock,
+				ShockReason: f.ShockReason,
+			})
 		}
 	}
 
-	fmt.Printf("\nAI Layer Time: %v\n", time.Since(aiStart))
+	stages = append(stages,
+		PipelineStageDTO{Name: "Policy Validator", Status: "complete"},
+		PipelineStageDTO{Name: "Forecast", Status: "complete"},
+		PipelineStageDTO{Name: "Explainability", Status: "complete"},
+	)
+	gitopsStatus := GitOpsDTO{
+		Status:  "skipped",
+		Message: "GitOps disabled or credentials missing",
+		PRs:     []GitOpsPRDTO{},
+	}
 
-	PrintSection("Running GitOps")
-
-	var prs []gitops.PRResponse
 	if pluginpkg.GitOps != nil {
-		var gitopsErr error
-		prs, gitopsErr = pluginpkg.GitOps.Run(g, decisionsGitops, nodeRisks)
-		if gitopsErr != nil {
-			fmt.Printf("GitOps skipped: %v\n", gitopsErr)
+		prs, err := pluginpkg.GitOps.Run(g, decisionsGitops, nodeRisks)
+		if err != nil {
+			gitopsStatus.Status = "skipped"
+			gitopsStatus.Message = err.Error()
+		} else {
+			gitopsStatus.Status = "ready"
+			gitopsStatus.Message = "Pull requests generated"
+			for _, pr := range prs {
+				gitopsStatus.PRs = append(gitopsStatus.PRs, GitOpsPRDTO{
+					URL:      pr.URL,
+					Status:   pr.Status,
+					PRNumber: pr.PRNumber,
+					Branch:   pr.Branch,
+					NodeID:   pr.NodeID,
+					Action:   pr.Action,
+					Message:  pr.Message,
+				})
+			}
 		}
 	}
 
-	merged := false
-	if len(prs) > 0 {
-		pr := prs[0]
-		if pr.PRNumber != 0 {
-			fmt.Printf("\nMerge PR #%d\n", pr.PRNumber)
-			merged = gitops.WaitForPRMerge(pr.PRNumber, pr.Branch)
-		}
-	}
-
-	if merged {
-		newGraph := gitops.GenerateFullProposedGraph(g, decisionsGitops)
-
-		if gitops.EvaluateGraph(newGraph, nodeRisks).TotalRisk <
-			gitops.EvaluateGraph(g, nodeRisks).TotalRisk {
-			g = newGraph
-			fmt.Println("Graph Updated")
-		}
-	} else {
-		fmt.Println("No PR merged")
-	}
-
-	PrintSection("Running Feedback Learning Loop")
+	stages = append(stages, PipelineStageDTO{Name: "GitOps", Status: gitopsStatus.Status})
 
 	records := feedback.Load()
-
 	for _, a := range approvedActions {
 		rec := feedback.CreateRecord(
 			a.NodeID,
@@ -412,33 +297,72 @@ func Run() error {
 		)
 		records = append(records, rec)
 	}
-
 	feedback.Save(records)
 
 	summary := feedback.Summarize(records)
 	newWeights := feedback.UpdateWeights(summary)
 
-	fmt.Printf("Feedback Avg Reward: %.2f\n", summary.AvgReward)
-	fmt.Printf("Feedback Count: %d\n", summary.Count)
-	fmt.Printf(
-		"Updated Weights → Risk: %.2f | Cost: %.2f | Penalty: %.2f\n",
-		newWeights.RiskWeight,
-		newWeights.CostWeight,
-		newWeights.Penalty,
-	)
+	stages = append(stages, PipelineStageDTO{Name: "Feedback Learning", Status: "complete"})
 
-	paths := securitysentinel.FindAttackPaths(g)
-
-	PrintSection("Final Graph Paths")
-	for i, path := range paths {
-		fmt.Printf("Path %d -> %v\n", i+1, path)
+	finalActions := make(map[string]RecommendationDTO)
+	for _, r := range recommendations {
+		finalActions[r.NodeID] = r
 	}
 
-	PrintSection("Execution Summary")
-	fmt.Printf("Total Time    : %v\n", time.Since(startTime))
-	fmt.Printf("Attack Paths  : %d\n", len(paths))
-	fmt.Printf("Nodes Analyzed: %d\n", len(g.Nodes))
+	var nodes []GraphNodeDTO
+	for _, n := range g.Nodes {
+		nodeDTO := GraphNodeDTO{
+			ID:          n.ID,
+			Label:       n.Name,
+			Type:        n.Type,
+			Cloud:       n.Cloud,
+			Region:      n.Region,
+			Environment: n.Environment,
+			Cost:        n.Cost,
+			Utilization: n.Utilization,
+			Exposure:    n.Exposure,
+			Criticality: n.Criticality,
+			Compliance:  n.Compliance,
+			Risk:        nodeRisks[n.ID],
+		}
+		if rec, ok := finalActions[n.ID]; ok {
+			nodeDTO.FinalAction = rec.FinalAction
+			nodeDTO.Status = rec.Status
+		}
+		nodes = append(nodes, nodeDTO)
+	}
 
-	fmt.Println("\nExecution Completed Successfully")
-	return nil
+	var edges []GraphEdgeDTO
+	for _, e := range g.Edges {
+		edges = append(edges, GraphEdgeDTO{
+			From:   e.From,
+			To:     e.To,
+			Type:   e.Type,
+			Weight: e.Weight,
+		})
+	}
+
+	result := &PipelineResult{
+		Scenario:        scenario,
+		Seed:            seed,
+		Nodes:           nodes,
+		Edges:           edges,
+		Recommendations: recommendations,
+		Explanations:    explanations,
+		Forecasts:       forecasts,
+		Feedback: FeedbackDTO{
+			AvgReward:  summary.AvgReward,
+			Count:      summary.Count,
+			RiskWeight: newWeights.RiskWeight,
+			CostWeight: newWeights.CostWeight,
+			Penalty:    newWeights.Penalty,
+		},
+		GitOps:      gitopsStatus,
+		AttackPaths: attackPaths,
+		Stages:      stages,
+		GeneratedAt: startTime.UTC().Format(time.RFC3339),
+	}
+
+	SetLatestState(result)
+	return result, nil
 }

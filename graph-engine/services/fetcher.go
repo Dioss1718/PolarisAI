@@ -27,7 +27,7 @@ func getSimulationBaseURL() string {
 	if v := os.Getenv("SIMULATION_API_URL"); v != "" {
 		return v
 	}
-	// Use IPv4 explicitly to avoid Windows localhost -> ::1 issues
+
 	return "http://127.0.0.1:7000"
 }
 

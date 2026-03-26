@@ -11,7 +11,7 @@ func Simulate(
 	variant string,
 ) (float64, float64, float64) {
 
-	// Compute richer dependency impact: in-degree + out-degree
+	//Compute richer dependency impact: in-degree + out-degree
 	inDegree := 0
 	for _, edges := range g.Adjacency {
 		for _, e := range edges {
@@ -34,7 +34,7 @@ func Simulate(
 	switch c.ActionType {
 
 	case "TERMINATE":
-		// SAFE vs FORCE must behave differently
+
 		if variant == "SAFE" {
 			return -c.BaseCost * 0.85, c.BaseRisk * 0.20, disruption * (1.0 + c.Centrality*0.8)
 		}
@@ -48,15 +48,15 @@ func Simulate(
 		if variant == "MEDIUM" {
 			return -c.BaseCost * 0.40, c.BaseRisk * 0.05, disruption * 0.55
 		}
-		// AGGRESSIVE
+
 		return -c.BaseCost * 0.60, c.BaseRisk * 0.10, disruption * 0.90
 
 	case "SECURE":
-		// PATCH: more risk reduction, slightly more cost
+
 		if variant == "PATCH" {
 			return c.BaseCost * 0.10, c.BaseRisk * 0.55, disruption * 0.25
 		}
-		// RESTRICT: slightly lower cost, strong security control
+
 		if variant == "RESTRICT" {
 			return c.BaseCost * 0.06, c.BaseRisk * 0.45, disruption * 0.20
 		}

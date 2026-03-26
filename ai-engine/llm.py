@@ -3,7 +3,7 @@ from groq import Groq
 from dotenv import load_dotenv
 from config import LLM_MODEL
 
-# Load environment variables from .env if present
+
 load_dotenv()
 
 _client = None

@@ -104,7 +104,7 @@ def explain(data: ExplainRequest):
         if not output or len(output.strip()) < 20:
             raise ValueError("LLM returned weak output")
 
-        # Hard post-filter for forbidden action words in recommendation text
+        
         forbidden = ["SCALE", "MIGRATE", "REDEPLOY", "RESTART"]
         fixed_output = output
         for word in forbidden:

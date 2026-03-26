@@ -14,7 +14,7 @@ func GenerateProposedGraph(current *Graph, d Decision) *Graph {
 
 	switch d.FinalAction {
 	case "TERMINATE_SAFE", "TERMINATE_FORCE":
-		// Keep graph values valid for downstream modules
+
 		node.Exposure = "PRIVATE"
 		node.Utilization = 0
 		node.Cost = 0

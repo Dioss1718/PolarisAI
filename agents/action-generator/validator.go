@@ -8,7 +8,6 @@ import (
 func IsValid(g *graph.Graph, c candidategenerator.Candidate, variant string) bool {
 	node := g.Nodes[c.NodeID]
 
-	// Strong PROD protection: no destructive action in production
 	if node.Environment == "PROD" && (variant == "AGGRESSIVE" || c.ActionType == "TERMINATE") {
 		return false
 	}

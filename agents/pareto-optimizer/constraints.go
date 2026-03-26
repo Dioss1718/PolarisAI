@@ -6,7 +6,6 @@ import (
 	"github.com/diya-suryawanshi/cloud/graph-engine/graph"
 )
 
-// Hard constraints (invalid actions)
 func IsValid(g *graph.Graph, action Action) bool {
 	node := g.Nodes[action.NodeID]
 	actionType := strings.ToUpper(action.ActionType)
@@ -24,7 +23,7 @@ func IsValid(g *graph.Graph, action Action) bool {
 	return true
 }
 
-// Soft penalty (trade-off cost)
+// trade-off cost
 func ConstraintPenalty(g *graph.Graph, action Action) float64 {
 	node := g.Nodes[action.NodeID]
 

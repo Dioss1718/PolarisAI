@@ -17,10 +17,7 @@ def load_model(node_id):
     with open(path, "rb") as f:
         payload = pickle.load(f)
 
-    # Supported formats:
-    # 1. (model, regressors)
-    # 2. {"model": model, "regressors": [...]}
-    # 3. model only
+    
     if isinstance(payload, tuple) and len(payload) == 2:
         model, regressors = payload
         return model, regressors or []
