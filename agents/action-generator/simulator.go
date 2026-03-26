@@ -11,12 +11,19 @@ func Simulate(
 	variant string,
 ) (float64, float64, float64) {
 
-	degree := float64(len(g.Adjacency[c.NodeID]))
+	// Compute richer dependency impact: in-degree + out-degree
+	inDegree := 0
+	for _, edges := range g.Adjacency {
+		for _, e := range edges {
+			if e.To == c.NodeID {
+				inDegree++
+			}
+		}
+	}
 
-	// 🔥 Graph-aware disruption
-	dependencyImpact := degree * 0.3
+	outDegree := len(g.Adjacency[c.NodeID])
+	dependencyImpact := float64(inDegree*2+outDegree) * 0.20
 
-	// 🔥 Environment sensitivity
 	envMultiplier := 1.0
 	if c.Env == "PROD" {
 		envMultiplier = 1.5
@@ -27,27 +34,32 @@ func Simulate(
 	switch c.ActionType {
 
 	case "TERMINATE":
-		riskReduction := c.BaseRisk * 0.3
-
-		// 🔥 More realistic: high central nodes = more disruption
-		disruption *= (1 + c.Centrality)
-
-		return -c.BaseCost, riskReduction, disruption
+		// SAFE vs FORCE must behave differently
+		if variant == "SAFE" {
+			return -c.BaseCost * 0.85, c.BaseRisk * 0.20, disruption * (1.0 + c.Centrality*0.8)
+		}
+		// FORCE
+		return -c.BaseCost, c.BaseRisk * 0.30, disruption * (1.2 + c.Centrality)
 
 	case "DOWNSIZE":
 		if variant == "SMALL" {
-			return -c.BaseCost * 0.2, 0, disruption * 0.4
+			return -c.BaseCost * 0.20, c.BaseRisk * 0.02, disruption * 0.35
 		}
 		if variant == "MEDIUM" {
-			return -c.BaseCost * 0.4, 0, disruption * 0.6
+			return -c.BaseCost * 0.40, c.BaseRisk * 0.05, disruption * 0.55
 		}
-
 		// AGGRESSIVE
-		return -c.BaseCost * 0.6, c.BaseRisk * 0.1, disruption
+		return -c.BaseCost * 0.60, c.BaseRisk * 0.10, disruption * 0.90
 
 	case "SECURE":
-		// 🔥 security reduces risk but may add latency (small disruption)
-		return c.BaseCost * 0.1, -c.BaseRisk * 0.6, disruption * 0.3
+		// PATCH: more risk reduction, slightly more cost
+		if variant == "PATCH" {
+			return c.BaseCost * 0.10, c.BaseRisk * 0.55, disruption * 0.25
+		}
+		// RESTRICT: slightly lower cost, strong security control
+		if variant == "RESTRICT" {
+			return c.BaseCost * 0.06, c.BaseRisk * 0.45, disruption * 0.20
+		}
 	}
 
 	return 0, 0, 0

@@ -3,22 +3,21 @@ package actiongenerator
 import "math"
 
 func Score(costDelta, riskReduction, disruption float64) float64 {
-
-	// 🔥 Normalize values
+	// Positive savings are better
 	costScore := -costDelta
 	riskScore := riskReduction
 
-	// 🔥 Non-linear penalty (important for top systems)
-	disruptionPenalty := math.Pow(disruption, 1.2)
+	// Non-linear disruption penalty
+	disruptionPenalty := math.Pow(disruption, 1.15)
 
-	// 🔥 Confidence estimation
+	// Confidence proxy: lower disruption → higher confidence
 	confidence := 1.0 / (1.0 + disruption)
 
 	score :=
-		(0.4 * riskScore) +
-			(0.4 * costScore) +
-			(0.2 * confidence) -
-			(0.3 * disruptionPenalty)
+		(0.40 * riskScore) +
+			(0.35 * costScore) +
+			(0.20 * confidence) -
+			(0.25 * disruptionPenalty)
 
-	return score
+	return math.Round(score*100) / 100
 }
