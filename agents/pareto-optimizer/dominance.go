@@ -8,22 +8,30 @@ func dominates(a, b Action) bool {
 			a.CostDelta < b.CostDelta)
 }
 
-// Pareto front filtering
+// Pareto front filtering should happen per node, not globally.
 func FilterPareto(actions []Action) []Action {
+	grouped := make(map[string][]Action)
+
+	for _, a := range actions {
+		grouped[a.NodeID] = append(grouped[a.NodeID], a)
+	}
+
 	var pareto []Action
 
-	for i, a := range actions {
-		dominated := false
+	for _, nodeActions := range grouped {
+		for i, a := range nodeActions {
+			dominated := false
 
-		for j, b := range actions {
-			if i != j && dominates(b, a) {
-				dominated = true
-				break
+			for j, b := range nodeActions {
+				if i != j && dominates(b, a) {
+					dominated = true
+					break
+				}
 			}
-		}
 
-		if !dominated {
-			pareto = append(pareto, a)
+			if !dominated {
+				pareto = append(pareto, a)
+			}
 		}
 	}
 

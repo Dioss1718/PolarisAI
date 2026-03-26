@@ -1,23 +1,28 @@
 package paretooptimizer
 
-import "github.com/diya-suryawanshi/cloud/graph-engine/graph"
+import (
+	"math"
+
+	"github.com/diya-suryawanshi/cloud/graph-engine/graph"
+)
 
 func ScoreAction(
 	g *graph.Graph,
 	action Action,
 	w Weights,
-	minCost, maxCost, minRisk, maxRisk float64,
+	minSavings, maxSavings, minRisk, maxRisk float64,
 ) float64 {
 
-	normCost := Normalize(-action.CostDelta, minCost, maxCost)
+	savings := -action.CostDelta
+	normSavings := Normalize(savings, minSavings, maxSavings)
 	normRisk := Normalize(action.RiskReduction, minRisk, maxRisk)
 
 	penalty := ConstraintPenalty(g, action)
 
 	score :=
 		w.RiskWeight*normRisk +
-			w.CostWeight*normCost -
+			w.CostWeight*normSavings -
 			w.Penalty*penalty
 
-	return score
+	return math.Round(score*100) / 100
 }
