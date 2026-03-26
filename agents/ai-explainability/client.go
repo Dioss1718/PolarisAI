@@ -2,13 +2,16 @@ package aiexplainability
 
 import (
 	"bytes"
-
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 )
+
+// ==============================
+// REQUEST / RESPONSE STRUCTS
+// ==============================
 
 type AIRequest struct {
 	NodeID        string  `json:"node_id"`
@@ -24,16 +27,24 @@ type AIRequest struct {
 }
 
 type AIResponse struct {
-	Explanation string `json:"explanation"`
+	Explanation string   `json:"explanation"`
+	Grounded    bool     `json:"grounded"`
+	Sources     []string `json:"sources"`
 }
 
-// 🔥 Production HTTP client
+// ==============================
+// CONFIG
+// ==============================
+
 var httpClient = &http.Client{
-	Timeout: 8 * time.Second,
+	Timeout: 10 * time.Second,
 }
 
-// 🔥 Configurable endpoint (plug-and-play)
 var explainURL = "http://localhost:8000/explain"
+
+// ==============================
+// MAIN FUNCTION
+// ==============================
 
 func GetExplanation(req AIRequest) (string, error) {
 
@@ -42,9 +53,7 @@ func GetExplanation(req AIRequest) (string, error) {
 		return "", fmt.Errorf("marshal error: %v", err)
 	}
 
-	url := "http://localhost:8000/explain"
-
-	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequest("POST", explainURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
 	}

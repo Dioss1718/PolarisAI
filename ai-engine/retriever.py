@@ -1,20 +1,40 @@
-import chromadb
-from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
+import chromadb
 from config import EMBED_MODEL, CHROMA_DB_DIR
 
 model = SentenceTransformer(EMBED_MODEL)
 
-client = chromadb.Client(Settings(persist_directory=CHROMA_DB_DIR))
+# ✅ SAME as ingest (CRITICAL)
+client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
 collection = client.get_or_create_collection(name="cloud_docs")
 
 
-def retrieve(query, node_type):
+def infer_categories(node_type: str, action: str):
+    categories = ["architecture"]
+
+    node_type = node_type.upper()
+
+    if node_type in {"DATABASE", "COMPUTE", "OBJECT_STORAGE", "LOAD_BALANCER", "IAM_ROLE"}:
+        categories.append("sla")
+
+    categories.append("security")
+    categories.append("compliance")
+
+    return list(set(categories))
+
+
+def retrieve(query, node_type, action, top_k=4):
     query_embedding = model.encode(query).tolist()
+
+    categories = infer_categories(node_type, action)
 
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=3
+        n_results=top_k,
+        where={"category": {"$in": categories}}
     )
 
-    return results.get("documents", [[]])[0]
+    docs = results.get("documents", [[]])[0]
+    metas = results.get("metadatas", [[]])[0]
+
+    return docs, metas

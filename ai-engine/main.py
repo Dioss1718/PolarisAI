@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import List
+
 from retriever import retrieve
 from prompt import build_prompt
 from llm import call_llm
@@ -7,7 +9,6 @@ from llm import call_llm
 app = FastAPI()
 
 
-# 🔥 STRONG CONTRACT (CRITICAL)
 class ExplainRequest(BaseModel):
     node_id: str
     action: str
@@ -24,25 +25,38 @@ class ExplainRequest(BaseModel):
 class ExplainResponse(BaseModel):
     explanation: str
     grounded: bool
-    sources: list[str]
+    sources: List[str]
 
 
-@app.post("/explain")
-def explain(data: dict):
+@app.post("/explain", response_model=ExplainResponse)
+def explain(data: ExplainRequest):
     try:
-        query = f"{data['action']} on {data['node_type']}"
+        query = (
+            f"{data.action} for {data.node_type} in {data.env} "
+            f"cost impact and security implications"
+        )
 
-        docs = retrieve(query, data["node_type"])
+        docs, metas = retrieve(query, data.node_type, data.action)
 
-        prompt = build_prompt(data, docs)
+        prompt = build_prompt(data.model_dump(), docs)
 
         output = call_llm(prompt)
 
         if not output or len(output.strip()) < 20:
-            raise ValueError("LLM returned empty output")
+            raise ValueError("LLM returned weak output")
 
-        return {"explanation": output}
+        sources = []
+        for meta in metas:
+            source = meta.get("source")
+            category = meta.get("category")
+            if source and category:
+                sources.append(f"{category}/{source}")
+
+        return ExplainResponse(
+            explanation=output,
+            grounded=len(docs) > 0,
+            sources=sources
+        )
 
     except Exception as e:
-        print("🔥 ERROR:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
