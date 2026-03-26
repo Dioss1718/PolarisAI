@@ -1,55 +1,55 @@
 package securitysentinel
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/diya-suryawanshi/cloud/graph-engine/graph"
 )
 
-// FindAttackPaths discovers all possible attack paths
-// from PUBLIC entry points to sensitive nodes
+// FindAttackPaths discovers possible attack paths
+// from attacker entry points to sensitive targets.
 func FindAttackPaths(g *graph.Graph) [][]string {
 	var allPaths [][]string
 
 	for _, node := range g.Nodes {
-
-		// Step 1: Entry points = PUBLIC nodes
-		if node.Exposure == "PUBLIC" {
-
-			// Step 2: BFS traversal with stopping condition
+		if isEntryPoint(node.Type, node.Exposure) {
 			paths := BFSWithTarget(g, node.ID)
-
 			allPaths = append(allPaths, paths...)
 		}
 	}
 
-	return allPaths
+	return deduplicatePaths(allPaths)
 }
 
-// BFSWithTarget performs BFS and stops when reaching sensitive nodes
+// BFSWithTarget explores multiple valid attack paths from a start node
+// to sensitive targets, without prematurely blocking alternate paths.
 func BFSWithTarget(g *graph.Graph, start string) [][]string {
 	var result [][]string
 
 	queue := [][]string{{start}}
-	visited := make(map[string]bool)
+	maxDepth := len(g.Nodes) + 2
 
 	for len(queue) > 0 {
 		path := queue[0]
 		queue = queue[1:]
 
-		current := path[len(path)-1]
-
-		if visited[current] {
+		if len(path) > maxDepth {
 			continue
 		}
-		visited[current] = true
 
-		// Step 3: Stop if sensitive node reached
+		current := path[len(path)-1]
+
 		if isSensitiveNode(g, current) && current != start {
 			result = append(result, path)
 			continue
 		}
 
-		// Traverse neighbors
 		for _, neighbor := range g.Adjacency[current] {
+			if containsNode(path, neighbor.To) {
+				continue
+			}
+
 			newPath := append([]string{}, path...)
 			newPath = append(newPath, neighbor.To)
 			queue = append(queue, newPath)
@@ -59,16 +59,17 @@ func BFSWithTarget(g *graph.Graph, start string) [][]string {
 	return result
 }
 
-// isSensitiveNode identifies high-value targets
+func isEntryPoint(nodeType, exposure string) bool {
+	return exposure == "PUBLIC" || nodeType == "SECURITY_GROUP"
+}
+
 func isSensitiveNode(g *graph.Graph, nodeID string) bool {
 	node := g.Nodes[nodeID]
 
-	// High-value database
 	if node.Type == "DATABASE" {
 		return true
 	}
 
-	// Admin IAM role
 	if node.Type == "IAM_ROLE" {
 		for _, flag := range node.Compliance {
 			if flag == "ADMIN_ACCESS" {
@@ -78,4 +79,32 @@ func isSensitiveNode(g *graph.Graph, nodeID string) bool {
 	}
 
 	return false
+}
+
+func containsNode(path []string, target string) bool {
+	for _, n := range path {
+		if n == target {
+			return true
+		}
+	}
+	return false
+}
+
+func deduplicatePaths(paths [][]string) [][]string {
+	seen := make(map[string]bool)
+	var unique [][]string
+
+	for _, path := range paths {
+		key := strings.Join(path, "->")
+		if !seen[key] {
+			seen[key] = true
+			unique = append(unique, path)
+		}
+	}
+
+	sort.Slice(unique, func(i, j int) bool {
+		return len(unique[i]) < len(unique[j])
+	})
+
+	return unique
 }
