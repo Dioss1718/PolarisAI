@@ -15,7 +15,7 @@ export async function getState() {
   return data;
 }
 
-export async function health() {
+export async function getServiceHealth() {
   const { data } = await api.get("/health");
   return data;
 }

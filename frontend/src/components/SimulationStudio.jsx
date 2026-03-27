@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { FileJson, Wand2 } from "lucide-react";
 
 const sampleManual = {
@@ -33,13 +33,13 @@ export default function SimulationStudio({ onRunManual, loading }) {
   };
 
   return (
-    <div className="rounded-2xl border border-borderSoft bg-panel/90 shadow-glow p-4">
+    <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 shadow-glow backdrop-blur-xl">
       <div className="flex items-center gap-2 text-sky-300">
         <Wand2 size={18} />
-        <h2 className="text-lg font-semibold">Simulation Studio</h2>
+        <h2 className="text-lg font-semibold text-white">Simulation Studio</h2>
       </div>
       <p className="mt-2 text-sm text-slate-400">
-        Run scenario-based synthetic simulation or manually inject a custom cloud graph for operator what-if testing.
+        Create operator-driven what-if scenarios by injecting custom cloud graph state directly into the governance engine.
       </p>
 
       <div className="mt-4">
@@ -50,12 +50,12 @@ export default function SimulationStudio({ onRunManual, loading }) {
         <textarea
           value={manualJSON}
           onChange={(e) => setManualJSON(e.target.value)}
-          className="h-64 w-full rounded-xl border border-borderSoft bg-slate-950/70 p-4 text-xs text-slate-200 outline-none"
+          className="h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-4 text-xs text-slate-200 outline-none"
         />
         <button
           onClick={submitManual}
           disabled={loading}
-          className="mt-3 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
+          className="mt-3 rounded-xl border border-sky-500/35 bg-sky-500/10 px-4 py-2 text-sm text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
         >
           Run Manual Simulation
         </button>

@@ -48,13 +48,16 @@ export default function GraphCanvas({ nodes = [], edges = [], onSelectNode }) {
       target: edge.to,
       label: edge.type,
       style: { stroke: "#64748b", strokeWidth: 1.5 },
-      labelStyle: { fill: "#cbd5e1", fontSize: 10, fontWeight: 500 },
-      labelBgStyle: {
-        fill: "#e5e7eb",
-        fillOpacity: 0.95,
-        rx: 6,
-        ry: 6,
-      },
+      labelStyle: { fill: "#e2e8f0", fontSize: 11, fontWeight: 500 },
+
+labelBgStyle: {
+  fill: "#020617",
+  fillOpacity: 0.9,
+  stroke: "#334155",
+  strokeWidth: 1,
+  rx: 8,
+  ry: 8,
+},
     }));
   }, [edges]);
 
