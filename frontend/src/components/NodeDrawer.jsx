@@ -1,4 +1,4 @@
-export default function NodeDrawer({ node, recommendation, explanation, forecast }) {
+export default function NodeDrawer({ node, recommendation, forecast }) {
   if (!node) {
     return (
       <div className="rounded-2xl border border-borderSoft bg-panel/90 shadow-glow p-4 min-h-[560px]">
@@ -52,14 +52,7 @@ export default function NodeDrawer({ node, recommendation, explanation, forecast
         </section>
       )}
 
-      {explanation ? (
-        <section className="mt-6">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-violet-300">AI Explainability</h3>
-          <div className="mt-2 rounded-xl bg-slate-950/70 p-3 text-sm whitespace-pre-wrap text-slate-200">
-            {explanation.explanation}
-          </div>
-        </section>
-      ) : null}
+      
     </div>
   );
 }

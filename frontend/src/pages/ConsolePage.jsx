@@ -152,7 +152,7 @@ export default function ConsolePage() {
           <NodeDrawer
             node={selectedNode}
             recommendation={selectedRecommendation}
-            explanation={selectedExplanation}
+            
             forecast={selectedForecast}
           />
         </div>
