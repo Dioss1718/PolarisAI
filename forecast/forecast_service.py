@@ -1,5 +1,7 @@
 import os
 import pickle
+import traceback
+import pandas as pd
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
@@ -11,13 +13,13 @@ BILL_SHOCK_ABS = float(os.getenv("BILL_SHOCK_ABS", 300))
 
 def load_model(node_id):
     path = os.path.join(MODEL_DIR, f"{node_id}.pkl")
+
     if not os.path.exists(path):
         return None, []
 
     with open(path, "rb") as f:
         payload = pickle.load(f)
 
-    
     if isinstance(payload, tuple) and len(payload) == 2:
         model, regressors = payload
         return model, regressors or []
@@ -45,25 +47,52 @@ def forecast():
     except ValueError:
         return jsonify({"error": "days must be an integer"}), 400
 
+    # Load model
     try:
         model, regressors = load_model(node_id)
     except Exception as e:
-        return jsonify({"error": f"Failed to load model for {node_id}", "details": str(e)}), 500
+        return jsonify({
+            "error": f"Failed to load model for {node_id}",
+            "details": str(e)
+        }), 500
 
     if model is None:
         return jsonify({"error": f"No model for {node_id}"}), 404
 
-    try:
-        future = model.make_future_dataframe(periods=days)
+    # Validate model integrity
+    if not hasattr(model, "predict") or not hasattr(model, "make_future_dataframe"):
+        return jsonify({
+            "error": f"Invalid model object for {node_id}"
+        }), 500
 
+    if not hasattr(model, "history") or model.history is None:
+        return jsonify({
+            "error": f"Model history missing for {node_id}"
+        }), 500
+
+    try:
+        # FIX: enforce stable frequency + datetime
+        future = model.make_future_dataframe(periods=days, freq="D")
+        future["ds"] = pd.to_datetime(future["ds"])
+
+        # Add regressors if any
         for reg in regressors:
             future[reg] = float(request.args.get(reg, 0))
 
+        # Predict
         result = model.predict(future)
+
+        if result is None or result.empty:
+            return jsonify({
+                "error": f"Empty prediction result for {node_id}"
+            }), 500
+
         tail = result.tail(days)
 
         if tail.empty:
-            return jsonify({"error": f"Forecast output empty for {node_id}"}), 500
+            return jsonify({
+                "error": f"Forecast output empty for {node_id}"
+            }), 500
 
         idx30 = min(29, len(tail) - 1)
 
@@ -79,8 +108,16 @@ def forecast():
             current = max(0.0, round(float(result.iloc[0]["yhat"]), 2))
 
     except Exception as e:
-        return jsonify({"error": f"Forecast computation failed for {node_id}", "details": str(e)}), 500
+        print("\nFORECAST CRASH:", node_id)
+        traceback.print_exc()
+        print("END CRASH\n")
 
+        return jsonify({
+            "error": f"Forecast computation failed for {node_id}",
+            "details": str(e)
+        }), 500
+
+    # Bill shock logic
     shock = False
     reason = ""
 
