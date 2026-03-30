@@ -15,8 +15,6 @@ import LoginDialog from "../components/LoginDialog";
 import CopilotDrawer from "../components/CopilotDrawer";
 import CopilotLauncher from "../components/CopilotLauncher";
 import BottomStatusBar from "../components/BottomStatusBar";
-import AlertsPanel from "../components/AlertsPanel";
-import StageTicker from "../components/StageTicker";
 import AnalysisWorkspacePage from "./AnalysisWorkspacePage";
 import SimulationStudio from "../components/SimulationStudio";
 
@@ -364,17 +362,17 @@ export default function ConsolePage() {
             highlightGraphNav={highlightGraphNav}
           />
 
-          <StageTicker loading={loading} stages={state.stages} />
-          <AlertsPanel alerts={state.alerts} onOpenWorkspace={openWorkspaceTab} />
-
           <div className="grid min-h-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.52fr)_minmax(700px,0.48fr)]">
+    
+    
             <div className="min-h-[460px]">
               <TopGovernanceActionsPanel
-                recommendations={state?.recommendations ?? []}
+                recommendations={state.recommendations}
                 onOpenWorkspace={openWorkspaceTab}
               />
             </div>
 
+            
             <div className="min-h-[460px] w-full">
               <SimulationStudio
                 onRunManual={runManual}
@@ -382,6 +380,9 @@ export default function ConsolePage() {
                 allowed={simulationAllowed}
               />
             </div>
+
+ 
+
           </div>
         </div>
       )}
@@ -412,7 +413,7 @@ export default function ConsolePage() {
 }
 
 function TopGovernanceActionsPanel({ recommendations = [], onOpenWorkspace }) {
-  const top = [...(recommendations ?? [])]
+  const top = [...(recommendations || [])]
     .sort((a, b) => Number(b.risk || 0) - Number(a.risk || 0))
     .slice(0, 6);
 

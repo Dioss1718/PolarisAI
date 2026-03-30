@@ -1,7 +1,6 @@
 export default function WorkspaceTabs({ activeTab, setActiveTab }) {
   const tabs = [
     ["graph", "Graph Workspace"],
-    ["attackpaths", "Attack Paths"],
     ["governance", "Governance Actions"],
     ["explainability", "Explainability"],
     ["billshock", "Bill Shock Watch"],
