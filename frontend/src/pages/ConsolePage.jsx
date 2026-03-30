@@ -1,56 +1,178 @@
-import React, { useEffect, useMemo, useState } from "react";
-import TopBar from "../components/TopBar";
+import { useEffect, useMemo, useState } from "react";
+import {
+  clearSession,
+  getMe,
+  getServiceHealth,
+  getSession,
+  getState,
+  runPipeline,
+} from "../api/client";
+import { deriveMetrics } from "../api/selectors";
+import AppShell from "../layout/AppShell";
+import HeaderBar from "../layout/HeaderBar";
+import MetaBar from "../layout/MetaBar";
+import LoginDialog from "../components/LoginDialog";
+import CopilotDrawer from "../components/CopilotDrawer";
+import CopilotLauncher from "../components/CopilotLauncher";
+import BottomStatusBar from "../components/BottomStatusBar";
+import AlertsPanel from "../components/AlertsPanel";
+import StageTicker from "../components/StageTicker";
+import AnalysisWorkspacePage from "./AnalysisWorkspacePage";
 import SimulationStudio from "../components/SimulationStudio";
-import GraphCanvas from "../components/GraphCanvas";
-import NodeDrawer from "../components/NodeDrawer";
-import DecisionRail from "../components/DecisionRail";
-import RecommendationPanel from "../components/RecommendationPanel";
-import ExplainabilityPanel from "../components/ExplainabilityPanel";
-import ForecastPanel from "../components/ForecastPanel";
-import GitOpsPanel from "../components/GitOpsPanel";
-import FeedbackPanel from "../components/FeedbackPanel";
-import CopilotPanel from "../components/CopilotPanel";
-import ServiceStatusBar from "../components/ServiceStatusBar";
-import { getServiceHealth, runPipeline } from "../api/client";
+
+const initialState = {
+  nodes: [],
+  edges: [],
+  recommendations: [],
+  explanations: [],
+  forecasts: [],
+  feedback: {},
+  gitops: { status: "idle", message: "No run yet", prs: [] },
+  attackPaths: [],
+  attackMetrics: null,
+  stages: [],
+  scenario: "",
+  seed: 42,
+  generatedAt: "",
+  summary: null,
+  projectedSummary: null,
+  alerts: [],
+  nodeIntel: [],
+  edgeInfluence: [],
+  negotiations: [],
+};
+
+function isUnauthorized(err) {
+  return err?.response?.status === 401;
+}
 
 export default function ConsolePage() {
+  const [session, setSession] = useState(getSession());
   const [scenario, setScenario] = useState("FULL_CHAOS");
   const [seed, setSeed] = useState(42);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [services, setServices] = useState([]);
-  const [state, setState] = useState({
-    nodes: [],
-    edges: [],
-    recommendations: [],
-    explanations: [],
-    forecasts: [],
-    feedback: {},
-    gitops: { status: "idle", message: "No run yet", prs: [] },
-    attackPaths: [],
-    stages: [],
-    scenario: "",
-    seed: 42,
-    generatedAt: "",
-  });
+  const [state, setState] = useState(initialState);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [selectedPathIndex, setSelectedPathIndex] = useState(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState("governance");
+  const [polling, setPolling] = useState(false);
+  const [hasRun, setHasRun] = useState(false);
+  const [pendingRunAfterLogin, setPendingRunAfterLogin] = useState(false);
+  const [highlightGraphNav, setHighlightGraphNav] = useState(false);
 
+  const invalidateSession = (
+    message = "Session expired or unauthorized. Please log in again."
+  ) => {
+    clearSession();
+    setSession(null);
+    setPolling(false);
+    setHasRun(false);
+    setServices([]);
+    setState(initialState);
+    setSelectedNodeId(null);
+    setSelectedPathIndex(null);
+    setWorkspaceOpen(false);
+    setPendingRunAfterLogin(false);
+    setHighlightGraphNav(false);
+    setErrorMessage(message);
+    setLoginOpen(true);
+  };
+
+  // Open login immediately after this page mounts if there is no usable session.
   useEffect(() => {
-    refreshServices();
+    let stopped = false;
+
+    const verifyStartupSession = async () => {
+      const existing = getSession();
+
+      if (!existing) {
+        if (!stopped) {
+          setSession(null);
+          setLoginOpen(true);
+        }
+        return;
+      }
+
+      try {
+        const me = await getMe();
+        if (!stopped) {
+          setSession(me || existing);
+          setLoginOpen(false);
+        }
+      } catch (err) {
+        if (isUnauthorized(err)) {
+          if (!stopped) {
+            invalidateSession("Please log in to continue.");
+          }
+        } else if (!stopped) {
+          setSession(existing);
+        }
+      }
+    };
+
+    verifyStartupSession();
+
+    return () => {
+      stopped = true;
+    };
   }, []);
 
-  const refreshServices = async () => {
-    try {
-      const data = await getServiceHealth();
-      setServices(Array.isArray(data)? data : data.services || []);
-    } catch {
-      setServices([
-        { name: "Governance API", status: "down" },
-        { name: "AI Engine", status: "down" },
-        { name: "Forecast Engine", status: "down" },
-      ]);
+  useEffect(() => {
+    if (!session) {
+      setPolling(false);
+      setHasRun(false);
+      setLoginOpen(true);
+      return;
     }
-  };
+
+    let stopped = false;
+
+    const loadHealthOnly = async () => {
+      try {
+        const serviceData = await getServiceHealth();
+        if (!stopped) {
+          setServices(Array.isArray(serviceData?.services) ? serviceData.services : []);
+        }
+      } catch {}
+    };
+
+    loadHealthOnly();
+
+    return () => {
+      stopped = true;
+    };
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || !hasRun || !polling || loading) return;
+
+    let stopped = false;
+
+    const loadLatestState = async () => {
+      try {
+        const data = await getState({ scenario, seed });
+        if (!stopped && data) {
+          hydrateState(data);
+        }
+      } catch (err) {
+        if (isUnauthorized(err) && !stopped) {
+          invalidateSession();
+        }
+      }
+    };
+
+    const timer = setInterval(loadLatestState, 5000);
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [session, hasRun, polling, loading, scenario, seed]);
 
   const selectedNode = useMemo(
     () => state.nodes.find((n) => n.id === selectedNodeId) || null,
@@ -62,125 +184,286 @@ export default function ConsolePage() {
     [state.recommendations, selectedNodeId]
   );
 
-  const selectedExplanation = useMemo(
-    () => state.explanations.find((e) => e.nodeId === selectedNodeId) || null,
-    [state.explanations, selectedNodeId]
-  );
-
   const selectedForecast = useMemo(
     () => state.forecasts.find((f) => f.nodeId === selectedNodeId) || null,
     [state.forecasts, selectedNodeId]
   );
 
-  const doRun = async (payload) => {
+  const selectedAttackPath = useMemo(() => {
+    if (selectedPathIndex === null || selectedPathIndex === undefined) return null;
+    return state.attackPaths?.[selectedPathIndex] || null;
+  }, [state.attackPaths, selectedPathIndex]);
+
+  const metrics = useMemo(() => deriveMetrics(state), [state]);
+
+  const hydrateState = (data) => {
+    setState((prev) => ({
+      ...prev,
+      ...data,
+      nodes: Array.isArray(data?.nodes) ? data.nodes : [],
+      edges: Array.isArray(data?.edges) ? data.edges : [],
+      recommendations: Array.isArray(data?.recommendations) ? data.recommendations : [],
+      explanations: Array.isArray(data?.explanations) ? data.explanations : [],
+      forecasts: Array.isArray(data?.forecasts) ? data.forecasts : [],
+      attackPaths: Array.isArray(data?.attackPaths) ? data.attackPaths : [],
+      attackMetrics: data?.attackMetrics || null,
+      summary: data?.summary || null,
+      projectedSummary: data?.projectedSummary || null,
+      stages: Array.isArray(data?.stages) ? data.stages : [],
+      alerts: Array.isArray(data?.alerts) ? data.alerts : [],
+      nodeIntel: Array.isArray(data?.nodeIntel) ? data.nodeIntel : [],
+      edgeInfluence: Array.isArray(data?.edgeInfluence) ? data.edgeInfluence : [],
+      negotiations: Array.isArray(data?.negotiations) ? data.negotiations : [],
+      gitops: data?.gitops || { status: "idle", message: "No run yet", prs: [] },
+    }));
+
+    if (Array.isArray(data?.nodes) && data.nodes.length) {
+      setSelectedNodeId((prev) => prev || data.nodes[0].id);
+    }
+
+    setHasRun(true);
+  };
+
+  const executeRun = async (manualData = null) => {
     setLoading(true);
+    setPolling(false);
     setErrorMessage("");
 
     try {
+      const payload = manualData
+        ? { scenario: "MANUAL", seed, manualData }
+        : { scenario, seed };
+
       const data = await runPipeline(payload);
-      setState({
-  ...data,
-  nodes: Array.isArray(data.nodes) ? data.nodes : [],
-  edges: Array.isArray(data.edges) ? data.edges : [],
-  recommendations: Array.isArray(data.recommendations) ? data.recommendations : [],
-  explanations: Array.isArray(data.explanations) ? data.explanations : [],
-  forecasts: Array.isArray(data.forecasts) ? data.forecasts : [],
-});
-      if (data.nodes?.length) {
-        setSelectedNodeId(data.nodes[0].id);
-      }
-      await refreshServices();
+      hydrateState(data);
+      setPolling(true);
+      setHighlightGraphNav(true);
     } catch (err) {
-      const msg = err?.response?.data?.error || err.message || "Pipeline run failed";
-      setErrorMessage(msg);
+      if (isUnauthorized(err)) {
+        invalidateSession();
+      } else {
+        setErrorMessage(
+          err?.response?.data?.error ||
+            err.message ||
+            (manualData ? "Manual simulation failed" : "Pipeline run failed")
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const runScenario = () => doRun({ scenario, seed });
-  const runManual = (manualData) => doRun({ scenario: "MANUAL", seed, manualData });
-
-  const selectByRecommendation = (rec) => {
-    setSelectedNodeId(rec.nodeId);
+  const runScenario = async () => {
+    if (!session) {
+      setPendingRunAfterLogin(true);
+      setLoginOpen(true);
+      return;
+    }
+    await executeRun(null);
   };
 
-  const selectNodeById = (nodeId) => {
-    setSelectedNodeId(nodeId);
+  const runManual = async (manualData) => {
+    if (!session) {
+      setPendingRunAfterLogin(true);
+      setLoginOpen(true);
+      return;
+    }
+    await executeRun(manualData);
   };
+
+  const handleLoggedIn = async (newSession) => {
+    setErrorMessage("");
+    setLoginOpen(false);
+
+    try {
+      const me = await getMe();
+      const finalSession = me || newSession;
+      setSession(finalSession);
+
+      if (pendingRunAfterLogin) {
+        setPendingRunAfterLogin(false);
+        setTimeout(() => {
+          executeRun(null);
+        }, 0);
+      }
+    } catch (err) {
+      if (isUnauthorized(err)) {
+        invalidateSession("Login succeeded locally, but backend rejected the session.");
+      } else {
+        setSession(newSession);
+        if (pendingRunAfterLogin) {
+          setPendingRunAfterLogin(false);
+          setTimeout(() => {
+            executeRun(null);
+          }, 0);
+        }
+      }
+    }
+  };
+
+  const logout = () => {
+    clearSession();
+    setSession(null);
+    setPolling(false);
+    setHasRun(false);
+    setLoginOpen(true);
+    setHighlightGraphNav(false);
+  };
+
+  const openWorkspaceTab = (tab) => {
+    if (tab === "graph") {
+      setHighlightGraphNav(false);
+    }
+    setWorkspaceTab(tab);
+    setWorkspaceOpen(true);
+  };
+
+  const simulationAllowed = session?.features?.SIMULATION_STUDIO === "FULL";
 
   return (
-    <div className="min-h-screen px-4 py-5 lg:px-6">
-      <div className="mx-auto max-w-[1840px] space-y-5">
-        <TopBar
-          onRun={runScenario}
+    <AppShell>
+      {workspaceOpen ? (
+        <AnalysisWorkspacePage
+          activeTab={workspaceTab}
+          setActiveTab={setWorkspaceTab}
+          state={state}
+          onBack={() => setWorkspaceOpen(false)}
+          onSelectNode={setSelectedNodeId}
+          onSelectPath={setSelectedPathIndex}
+          selectedPathIndex={selectedPathIndex}
+          selectedNode={selectedNode}
+          selectedRecommendation={selectedRecommendation}
+          selectedForecast={selectedForecast}
+          selectedAttackPath={selectedAttackPath}
+          onRunManual={runManual}
           loading={loading}
-          scenario={scenario}
-          setScenario={setScenario}
-          seed={seed}
-          setSeed={setSeed}
+          simulationAllowed={simulationAllowed}
         />
+      ) : (
+        <div className="grid min-h-screen grid-rows-[94px_auto_1fr] gap-3 overflow-x-hidden px-0 pb-24">
+          <HeaderBar
+            scenario={scenario}
+            setScenario={setScenario}
+            seed={seed}
+            setSeed={setSeed}
+            onRun={runScenario}
+            loading={loading}
+            onOpenLogin={() => setLoginOpen(true)}
+            session={session}
+            onLogout={logout}
+            onOpenWorkspace={openWorkspaceTab}
+          />
 
-        <ServiceStatusBar
-          services={services}
-          generatedAt={state.generatedAt}
-          scenario={state.scenario}
-          seed={state.seed}
-        />
+          <MetaBar
+            metrics={metrics}
+            scenario={state.scenario || scenario}
+            seed={state.seed ?? seed}
+            services={services}
+            gitops={state.gitops}
+            onOpenWorkspace={openWorkspaceTab}
+            highlightGraphNav={highlightGraphNav}
+          />
 
-        {errorMessage ? (
-          <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4 text-sm text-rose-200 shadow-glow">
-            <div className="font-semibold">Pipeline Error</div>
-            <div className="mt-1">{errorMessage}</div>
+          <StageTicker loading={loading} stages={state.stages} />
+          <AlertsPanel alerts={state.alerts} onOpenWorkspace={openWorkspaceTab} />
+
+          <div className="grid min-h-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.52fr)_minmax(700px,0.48fr)]">
+            <div className="min-h-[460px]">
+              <TopGovernanceActionsPanel
+                recommendations={state?.recommendations ?? []}
+                onOpenWorkspace={openWorkspaceTab}
+              />
+            </div>
+
+            <div className="min-h-[460px] w-full">
+              <SimulationStudio
+                onRunManual={runManual}
+                loading={loading}
+                allowed={simulationAllowed}
+              />
+            </div>
           </div>
-        ) : null}
+        </div>
+      )}
 
-        {loading ? (
-          <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-4 text-sm text-sky-200 shadow-glow">
-            Governance execution is running. Large AI or GitOps stages may take longer depending on environment state.
+      <BottomStatusBar
+        session={session}
+        services={services}
+        metrics={metrics}
+        autoRefreshOn={polling}
+      />
+
+      <CopilotLauncher onClick={() => setCopilotOpen(true)} />
+      <CopilotDrawer
+        open={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        state={state}
+        onSelectNode={setSelectedNodeId}
+      />
+      <LoginDialog
+        open={loginOpen}
+        onClose={() => {
+          if (session) setLoginOpen(false);
+        }}
+        onLoggedIn={handleLoggedIn}
+      />
+    </AppShell>
+  );
+}
+
+function TopGovernanceActionsPanel({ recommendations = [], onOpenWorkspace }) {
+  const top = [...(recommendations ?? [])]
+    .sort((a, b) => Number(b.risk || 0) - Number(a.risk || 0))
+    .slice(0, 6);
+
+  return (
+    <div className="min-h-[420px] rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-lg font-semibold">Top Governance Actions</div>
+          <div className="text-sm text-slate-400">
+            Highest-priority governance decisions from the latest run.
           </div>
-        ) : null}
-
-        <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[1.15fr_0.85fr]">
-          <GraphCanvas
-            nodes={state.nodes}
-            edges={state.edges}
-            attackPathCount={state.attackPaths?.length || 0}
-            onSelectNode={(node) => setSelectedNodeId(node?.id)}
-          />
-
-          <NodeDrawer
-            node={selectedNode}
-            recommendation={selectedRecommendation}
-            
-            forecast={selectedForecast}
-          />
         </div>
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-          <SimulationStudio onRunManual={runManual} loading={loading} />
-          <DecisionRail stages={state.stages} />
-        </div>
+        <button
+          onClick={() => onOpenWorkspace?.("governance")}
+          className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-2 text-sm text-sky-200"
+        >
+          Open Governance Workspace
+        </button>
+      </div>
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1fr]">
-          <RecommendationPanel
-            recommendations={state.recommendations}
-            onSelect={selectByRecommendation}
-          />
-          <ExplainabilityPanel
-            explanations={state.explanations}
-            onSelect={selectNodeById}
-          />
-        </div>
+      <div className="mt-4 max-h-[360px] overflow-auto pr-1">
+        {top.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-slate-950/60 p-4 text-sm text-slate-400">
+            No governance actions available yet.
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {top.map((r) => (
+              <div
+                key={`${r.nodeId}-${r.finalAction}`}
+                className="rounded-xl border border-white/10 bg-slate-950/60 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-slate-100">{r.nodeId}</div>
+                    <div className="mt-1 text-sm text-slate-400">
+                      {r.finalAction} · {r.status}
+                    </div>
+                  </div>
 
-        <ForecastPanel forecasts={state.forecasts} onSelect={selectNodeById} />
+                  <div className="rounded-full border border-white/10 bg-slate-900/70 px-3 py-1 text-xs text-slate-300">
+                    Risk {Number(r.risk || 0).toFixed(2)}
+                  </div>
+                </div>
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1fr]">
-          <GitOpsPanel gitops={state.gitops} />
-          <FeedbackPanel feedback={state.feedback} />
-        </div>
-
-        <CopilotPanel state={state} onSelectNode={selectNodeById} />
+                <div className="mt-3 text-sm text-slate-300">{r.reason}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

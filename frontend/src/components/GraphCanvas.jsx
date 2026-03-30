@@ -1,128 +1,141 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Background, Controls, MiniMap, ReactFlow } from "@xyflow/react";
+import { useMemo } from "react";
+import { Background, Controls, MiniMap, ReactFlow, MarkerType } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-const riskColor = (risk) => {
-  if (risk >= 8) return "#ef4444";
-  if (risk >= 6) return "#f97316";
-  if (risk >= 4) return "#eab308";
+function riskColor(risk) {
+  if (risk >= 8.5) return "#f43f5e";
+  if (risk >= 7) return "#f97316";
+  if (risk >= 5) return "#facc15";
   return "#22c55e";
-};
+}
 
-export default function GraphCanvas({ nodes = [], edges = [], onSelectNode }) {
-  const [rfKey, setRfKey] = useState(0);
+function cloudBadge(cloud) {
+  if (cloud === "AWS") return "◆";
+  if (cloud === "AZURE") return "■";
+  if (cloud === "GCP") return "▲";
+  return "●";
+}
 
-  useEffect(() => {
-    setRfKey((k) => k + 1);
-  }, [nodes, edges]);
+function buildPathEdgeSet(path) {
+  const set = new Set();
+  if (!Array.isArray(path) || path.length < 2) return set;
+  for (let i = 0; i < path.length - 1; i++) {
+    set.add(`${path[i]}->${path[i + 1]}`);
+  }
+  return set;
+}
+
+function nodeTypeY(type) {
+  const map = {
+    INTERNET: 60,
+    LOAD_BALANCER: 120,
+    COMPUTE: 220,
+    IAM_ROLE: 340,
+    DATABASE: 470,
+    STORAGE: 560,
+    KUBERNETES: 660,
+  };
+  return map[type] ?? 260;
+}
+
+function cloudBandX(cloud) {
+  const map = { AWS: 120, AZURE: 500, GCP: 880 };
+  return map[cloud] ?? 120;
+}
+
+export default function GraphCanvas({
+  nodes = [],
+  edges = [],
+  nodeIntel = [],
+  selectedAttackPath = null,
+  onSelectNode,
+}) {
+  const intelMap = useMemo(
+    () => new Map((nodeIntel || []).map((i) => [i.nodeId, i])),
+    [nodeIntel]
+  );
+
+  const pathEdgeSet = useMemo(() => buildPathEdgeSet(selectedAttackPath), [selectedAttackPath]);
+  const pathNodeSet = useMemo(() => new Set(selectedAttackPath || []), [selectedAttackPath]);
 
   const flowNodes = useMemo(() => {
-    return nodes.map((node, index) => ({
-      id: node.id,
-      position: {
-        x: 120 + (index % 4) * 240,
-        y: 100 + Math.floor(index / 4) * 180,
-      },
-      data: {
-        label: `${node.label} · ${node.cloud}`,
-      },
-      style: {
-        background: "#0f172a",
-        color: "#fff",
-        border: `2px solid ${riskColor(node.risk)}`,
-        borderRadius: 16,
-        padding: 12,
-        width: 180,
-        boxShadow: `0 0 24px ${riskColor(node.risk)}33`,
-        fontSize: 13,
-        fontWeight: 500,
-        textAlign: "center",
-      },
-    }));
-  }, [nodes]);
+    const cloudOffsets = {};
+    return nodes.map((node) => {
+      const intel = intelMap.get(node.id);
+      const highlighted = pathNodeSet.has(node.id);
+      const xBase = cloudBandX(node.cloud);
+      const yBase = nodeTypeY(node.type);
+      const seq = cloudOffsets[node.cloud] ?? 0;
+      cloudOffsets[node.cloud] = seq + 1;
+
+      const x = xBase + (seq % 2) * 220;
+      const y = yBase + Math.floor(seq / 2) * 120;
+
+      const halo = highlighted
+        ? "0 0 50px rgba(244,63,94,0.38)"
+        : `0 0 ${18 + (intel?.blastRadius || 0) * 1.4}px ${riskColor(node.risk)}25`;
+
+      return {
+        id: node.id,
+        position: { x, y },
+        data: {
+          label: `${cloudBadge(node.cloud)} ${node.label}`,
+        },
+        style: {
+          background: highlighted ? "#1e1b4b" : "#08111f",
+          color: "white",
+          border: `2px solid ${highlighted ? "#f43f5e" : riskColor(node.risk)}`,
+          borderRadius: 18,
+          width: 220,
+          padding: 12,
+          fontSize: 12,
+          fontWeight: 600,
+          boxShadow: halo,
+        },
+      };
+    });
+  }, [nodes, intelMap, pathNodeSet]);
 
   const flowEdges = useMemo(() => {
-    return edges.map((edge, i) => ({
-      id: `edge-${i}`,
-      source: edge.from,
-      target: edge.to,
-      label: edge.type,
-      style: { stroke: "#64748b", strokeWidth: 1.5 },
-      labelStyle: { fill: "#e2e8f0", fontSize: 11, fontWeight: 500 },
-
-labelBgStyle: {
-  fill: "#020617",
-  fillOpacity: 0.9,
-  stroke: "#334155",
-  strokeWidth: 1,
-  rx: 8,
-  ry: 8,
-},
-    }));
-  }, [edges]);
+    return edges.map((edge, index) => {
+      const highlighted = pathEdgeSet.has(`${edge.from}->${edge.to}`);
+      return {
+        id: `e-${index}`,
+        source: edge.from,
+        target: edge.to,
+        label: edge.type,
+        animated: highlighted,
+        type: "smoothstep",
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: highlighted ? "#f43f5e" : "#64748b",
+        },
+        style: {
+          stroke: highlighted ? "#f43f5e" : "#64748b",
+          strokeWidth: highlighted ? 3.5 : 1.6,
+          opacity: highlighted ? 1 : 0.75,
+        },
+        labelStyle: {
+          fill: highlighted ? "#fecdd3" : "#cbd5e1",
+          fontSize: 10,
+        },
+      };
+    });
+  }, [edges, pathEdgeSet]);
 
   return (
-    <div className="rounded-2xl border border-borderSoft bg-panel/90 shadow-glow p-3 h-[560px]">
-      <div className="mb-3">
-        <h2 className="text-lg font-semibold">Unified Cloud Graph</h2>
-        <p className="text-sm text-slate-400">
-          Risk-colored nodes, governance decisions, and attack-path aware topology.
-        </p>
-      </div>
-
-      <div className="h-[490px] rounded-xl overflow-hidden bg-slate-950">
-        {flowNodes.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-slate-500">
-            Run governance to load graph topology.
-          </div>
-        ) : (
-          <ReactFlow
-            key={rfKey}
-            nodes={flowNodes}
-            edges={flowEdges}
-            fitView
-            onNodeClick={(_, n) => {
-              const selected = nodes.find((x) => x.id === n.id);
-              if (onSelectNode) onSelectNode(selected);
-            }}
-          >
-            <MiniMap
-              pannable
-              zoomable
-              position="bottom-right"
-              nodeColor={(node) => {
-                const original = nodes.find((n) => n.id === node.id);
-                return original ? riskColor(original.risk) : "#64748b";
-              }}
-              maskColor="rgba(2, 6, 23, 0.72)"
-              style={{
-                backgroundColor: "#0f172a",
-                border: "1px solid #334155",
-                borderRadius: 14,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-              }}
-            />
-
-            <Controls
-              position="bottom-left"
-              showInteractive={false}
-              style={{
-                background: "#0f172a",
-                border: "1px solid #334155",
-                borderRadius: "14px",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-                overflow: "hidden",
-              }}
-            />
-
-            <Background
-              color="#1e293b"
-              gap={18}
-              size={1}
-            />
-          </ReactFlow>
-        )}
-      </div>
+    <div className="h-full min-h-[420px] w-full overflow-hidden rounded-xl bg-slate-950">
+      <ReactFlow
+        nodes={flowNodes}
+        edges={flowEdges}
+        fitView
+        style={{ width: "100%", height: "100%" }}
+        onNodeClick={(_, node) => onSelectNode?.(nodes.find((n) => n.id === node.id))}
+      >
+        <MiniMap pannable zoomable />
+        <Controls showInteractive={false} />
+        <Background color="#1e293b" gap={18} size={1} />
+      </ReactFlow>
     </div>
   );
 }

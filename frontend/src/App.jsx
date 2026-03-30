@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import SplashIntro from "./components/SplashIntro";
 import ConsolePage from "./pages/ConsolePage";
 

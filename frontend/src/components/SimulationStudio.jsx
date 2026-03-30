@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { FileJson, Wand2 } from "lucide-react";
+import { useState } from "react";
 
 const sampleManual = {
   nodes: [
@@ -14,52 +13,55 @@ const sampleManual = {
       utilization: 18,
       exposure: "PUBLIC",
       criticality: 8,
-      compliance_flags: ["PCI"]
-    }
+      compliance_flags: ["PCI"],
+    },
   ],
-  edges: []
+  edges: [],
 };
 
-export default function SimulationStudio({ onRunManual, loading }) {
+export default function SimulationStudio({ onRunManual, loading, allowed = true }) {
   const [manualJSON, setManualJSON] = useState(JSON.stringify(sampleManual, null, 2));
 
-  const submitManual = () => {
+  const submit = () => {
     try {
       const parsed = JSON.parse(manualJSON);
       onRunManual(parsed);
     } catch {
-      alert("Manual simulation JSON is invalid.");
+      window.alert("Manual simulation JSON is invalid.");
     }
   };
 
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 shadow-glow backdrop-blur-xl">
-      <div className="flex items-center gap-2 text-sky-300">
-        <Wand2 size={18} />
-        <h2 className="text-lg font-semibold text-white">Simulation Studio</h2>
+  if (!allowed) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="text-lg font-semibold">Simulation Studio</div>
+        <div className="mt-2 text-sm text-slate-400">
+          Your role does not have access to simulation studio.
+        </div>
       </div>
-      <p className="mt-2 text-sm text-slate-400">
-        Create operator-driven what-if scenarios by injecting custom cloud graph state directly into the governance engine.
+    );
+  }
+
+  return (
+    <div className="min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="text-lg font-semibold">Simulation Studio</div>
+      <p className="mt-1 text-sm text-slate-400">
+        Inject manual cloud graph state directly into the pipeline.
       </p>
 
-      <div className="mt-4">
-        <label className="mb-2 flex items-center gap-2 text-sm text-slate-300">
-          <FileJson size={16} />
-          Manual synthetic data
-        </label>
-        <textarea
-          value={manualJSON}
-          onChange={(e) => setManualJSON(e.target.value)}
-          className="h-64 w-full rounded-xl border border-white/10 bg-slate-950/80 p-4 text-xs text-slate-200 outline-none"
-        />
-        <button
-          onClick={submitManual}
-          disabled={loading}
-          className="mt-3 rounded-xl border border-sky-500/35 bg-sky-500/10 px-4 py-2 text-sm text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
-        >
-          Run Manual Simulation
-        </button>
-      </div>
+      <textarea
+        value={manualJSON}
+        onChange={(e) => setManualJSON(e.target.value)}
+        className="mt-4 h-[calc(100%-110px)] w-full rounded-xl border border-white/10 bg-slate-950/80 p-4 text-xs outline-none"
+      />
+
+      <button
+        onClick={submit}
+        disabled={loading}
+        className="mt-3 rounded-xl border border-sky-500/35 bg-sky-500/10 px-4 py-2 text-sm text-sky-300 disabled:opacity-50"
+      >
+        Run Manual Simulation
+      </button>
     </div>
   );
 }

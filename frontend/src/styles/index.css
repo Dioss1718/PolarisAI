@@ -5,11 +5,13 @@
 html,
 body,
 #root {
+  width: 100%;
   height: 100%;
+  margin: 0;
 }
 
 body {
-  margin: 0;
+  overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 28%),
     radial-gradient(circle at top right, rgba(168, 85, 247, 0.12), transparent 28%),
@@ -23,16 +25,40 @@ body {
   box-sizing: border-box;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+.bg-app {
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(168, 85, 247, 0.12), transparent 28%),
+    radial-gradient(circle at bottom center, rgba(255, 255, 255, 0.03), transparent 35%),
+    #020617;
 }
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
 ::-webkit-scrollbar-thumb {
   background: #334155;
   border-radius: 999px;
 }
+
 ::-webkit-scrollbar-track {
   background: #0f172a;
+}
+
+.react-flow__controls-button {
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+.react-flow__controls-button svg {
+  fill: #e2e8f0 !important;
+}
+
+.react-flow__attribution {
+  display: none !important;
 }
 
 .glass-logo-shell {
@@ -96,17 +122,12 @@ body {
     opacity: 1;
   }
 }
-
-.react-flow__controls-button {
-  background: #0f172a !important;
-  color: #e2e8f0 !important;
-  border-bottom: 1px solid #334155 !important;
+button {
+  cursor: pointer;
 }
 
-.react-flow__controls-button svg {
-  fill: #e2e8f0 !important;
-}
-
-.react-flow__attribution {
-  display: none !important;
+select,
+input,
+textarea {
+  min-width: 0;
 }

@@ -16,6 +16,7 @@ import (
 	riskengine "github.com/diya-suryawanshi/cloud/agents/security-sentinel/risk-engine"
 	feedback "github.com/diya-suryawanshi/cloud/backend/feedback"
 	pluginpkg "github.com/diya-suryawanshi/cloud/backend/plugin"
+	"github.com/diya-suryawanshi/cloud/carbon"
 	forecast "github.com/diya-suryawanshi/cloud/forecast"
 	gitops "github.com/diya-suryawanshi/cloud/gitops"
 	"github.com/diya-suryawanshi/cloud/graph-engine/builder"
@@ -29,6 +30,7 @@ func Run(req RunRequest) (*PipelineResult, error) {
 	if scenario == "" {
 		scenario = "FULL_CHAOS"
 	}
+
 	seed := req.Seed
 	if seed == 0 {
 		seed = 42
@@ -46,34 +48,38 @@ func Run(req RunRequest) (*PipelineResult, error) {
 
 		jsonData, err := json.Marshal(data)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal simulation response: %w", err)
+			return nil, fmt.Errorf("failed to marshal simulation data: %w", err)
 		}
 
 		if err := json.Unmarshal(jsonData, &parsed); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal simulation response: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal simulation data: %w", err)
 		}
 	}
 
 	g := builder.BuildGraph(parsed)
 
 	stages := []PipelineStageDTO{
-		{Name: "Simulation", Status: "complete"},
-		{Name: "Graph", Status: "complete"},
+		{Name: "Graph Build", Status: "complete"},
+		{Name: "Risk Modeling", Status: "running"},
 	}
 
 	var (
-		attackPaths [][]string
 		nodeRisks   map[string]float64
+		attackPaths [][]string
 		signals     []costoptimizer.CostSignal
 	)
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		nodeRisks = riskengine.ComputeNodeRisk(g)
+	}()
 
 	go func() {
 		defer wg.Done()
 		attackPaths = securitysentinel.FindAttackPaths(g)
-		nodeRisks = riskengine.ComputeNodeRisk(g)
 	}()
 
 	go func() {
@@ -82,13 +88,15 @@ func Run(req RunRequest) (*PipelineResult, error) {
 	}()
 
 	wg.Wait()
+
+	attackMetrics := ComputeAttackMetrics(attackPaths)
+
 	stages = append(stages,
 		PipelineStageDTO{Name: "Security Sentinel", Status: "complete"},
 		PipelineStageDTO{Name: "Cost Optimizer", Status: "complete"},
 	)
 
 	candidates := candidategenerator.GenerateCandidates(g, signals, nodeRisks)
-	_ = candidates
 	stages = append(stages, PipelineStageDTO{Name: "Candidate Generator", Status: "complete"})
 
 	actions := actiongenerator.GenerateActions(g, candidates)
@@ -129,6 +137,8 @@ func Run(req RunRequest) (*PipelineResult, error) {
 		EncryptionRequired: true,
 	}
 
+	blastMap := computeBlastRadius(g)
+
 	var recommendations []RecommendationDTO
 	var decisionsGitops []gitops.Decision
 	var approvedActions []actiongenerator.Action
@@ -146,6 +156,7 @@ func Run(req RunRequest) (*PipelineResult, error) {
 				}
 			}
 		}
+
 		outDegree := len(g.Adjacency[d.NodeID])
 		centrality := float64(inDegree*2+outDegree) / 10.0
 		if centrality > 1.0 {
@@ -171,11 +182,10 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			risk,
 		)
 
-		finalScore :=
-			0.3*scores.SLA +
-				0.3*scores.Security +
-				0.2*scores.Compliance +
-				0.2*scores.Blast
+		finalScore := 0.3*scores.SLA +
+			0.3*scores.Security +
+			0.2*scores.Compliance +
+			0.2*scores.Blast
 
 		status := "APPROVED"
 		finalAction := d.Action
@@ -187,17 +197,29 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			finalAction = "SAFE_" + d.Action
 		}
 
+		srcAction := actionLookup[d.NodeID+"|"+d.Action]
+		confidence := deriveConfidence(srcAction.Score, finalScore, node.Environment)
+		safetyLevel := deriveSafetyLevel(node.Environment, node.Exposure, finalScore)
+
 		rec := RecommendationDTO{
-			NodeID:      d.NodeID,
-			Action:      d.Action,
-			FinalAction: finalAction,
-			Status:      status,
-			Score:       finalScore,
-			Reason:      d.Reason,
-			Risk:        risk,
-			Cloud:       node.Cloud,
-			Type:        node.Type,
-			Environment: node.Environment,
+			NodeID:         d.NodeID,
+			Action:         d.Action,
+			FinalAction:    finalAction,
+			Status:         status,
+			Score:          round2(finalScore),
+			Reason:         d.Reason,
+			Risk:           round2(risk),
+			Cloud:          node.Cloud,
+			Type:           node.Type,
+			Environment:    node.Environment,
+			CostDelta:      round2(srcAction.CostDelta),
+			RiskReduction:  round2(srcAction.RiskReduction),
+			Confidence:     confidence,
+			SafetyLevel:    safetyLevel,
+			BlastRadius:    blastMap[d.NodeID],
+			ComplianceGain: round2(scores.Compliance),
+			GitOpsPath:     fmt.Sprintf("GitOps PR -> branch polaris/%s/%s", d.NodeID, finalAction),
+			RollbackPath:   fmt.Sprintf("Rollback via revert of branch polaris/%s/%s", d.NodeID, finalAction),
 		}
 		recommendations = append(recommendations, rec)
 
@@ -213,8 +235,8 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			Reason:      "Policy Approved",
 		})
 
-		if srcAction, ok := actionLookup[d.NodeID+"|"+d.Action]; ok {
-			approvedActions = append(approvedActions, srcAction)
+		if src, ok := actionLookup[d.NodeID+"|"+d.Action]; ok {
+			approvedActions = append(approvedActions, src)
 		}
 
 		explainReq := aiexplain.AIRequest{
@@ -222,7 +244,7 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			Action:        finalAction,
 			Env:           node.Environment,
 			NodeType:      node.Type,
-			Cost:          0,
+			Cost:          srcAction.CostDelta,
 			RiskReduction: d.Score,
 			SLA:           scores.SLA,
 			Security:      scores.Security,
@@ -256,6 +278,7 @@ func Run(req RunRequest) (*PipelineResult, error) {
 		PipelineStageDTO{Name: "Forecast", Status: "complete"},
 		PipelineStageDTO{Name: "Explainability", Status: "complete"},
 	)
+
 	gitopsStatus := GitOpsDTO{
 		Status:  "skipped",
 		Message: "GitOps disabled or credentials missing",
@@ -270,6 +293,7 @@ func Run(req RunRequest) (*PipelineResult, error) {
 		} else {
 			gitopsStatus.Status = "ready"
 			gitopsStatus.Message = "Pull requests generated"
+
 			for _, pr := range prs {
 				gitopsStatus.PRs = append(gitopsStatus.PRs, GitOpsPRDTO{
 					URL:      pr.URL,
@@ -288,20 +312,19 @@ func Run(req RunRequest) (*PipelineResult, error) {
 
 	records := feedback.Load()
 	for _, a := range approvedActions {
-		rec := feedback.CreateRecord(
+		record := feedback.CreateRecord(
 			a.NodeID,
 			a.ActionType+"_"+a.Variant,
 			a.CostDelta,
 			a.RiskReduction,
 			a.Score,
 		)
-		records = append(records, rec)
+		records = append(records, record)
 	}
 	feedback.Save(records)
 
-	summary := feedback.Summarize(records)
-	newWeights := feedback.UpdateWeights(summary)
-
+	feedbackSummary := feedback.Summarize(records)
+	newWeights := feedback.UpdateWeights(feedbackSummary)
 	stages = append(stages, PipelineStageDTO{Name: "Feedback Learning", Status: "complete"})
 
 	finalActions := make(map[string]RecommendationDTO)
@@ -325,10 +348,12 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			Compliance:  n.Compliance,
 			Risk:        nodeRisks[n.ID],
 		}
+
 		if rec, ok := finalActions[n.ID]; ok {
 			nodeDTO.FinalAction = rec.FinalAction
 			nodeDTO.Status = rec.Status
 		}
+
 		nodes = append(nodes, nodeDTO)
 	}
 
@@ -342,6 +367,37 @@ func Run(req RunRequest) (*PipelineResult, error) {
 		})
 	}
 
+	currentCarbon := carbon.Run(carbon.FromGraphNodes(g.Nodes))
+
+	projectedGraph := gitops.GenerateFullProposedGraph(g, decisionsGitops)
+	projectedAttackPaths := securitysentinel.FindAttackPaths(projectedGraph)
+	projectedAttackMetrics := ComputeAttackMetrics(projectedAttackPaths)
+	projectedRisks := riskengine.ComputeNodeRisk(projectedGraph)
+	projectedCarbon := carbon.Run(carbon.FromGraphNodes(projectedGraph.Nodes))
+
+	summary := BuildCurrentSummary(
+		g,
+		attackMetrics,
+		recommendations,
+		forecasts,
+		nodeRisks,
+		currentCarbon,
+	)
+
+	projectedSummary := BuildProjectedSummary(
+		projectedGraph,
+		projectedAttackMetrics,
+		projectedRisks,
+		projectedCarbon,
+		currentCarbon.Total,
+		summary.AverageRisk,
+	)
+
+	nodeIntel := buildNodeIntel(g, nodeRisks, attackPaths, forecasts)
+	edgeInfluence := buildEdgeInfluence(g, nodeRisks)
+	negotiations := buildNegotiationTraces(actions, recommendations)
+	alerts := buildStructuredAlerts(summary, projectedSummary, recommendations, nodeIntel)
+
 	result := &PipelineResult{
 		Scenario:        scenario,
 		Seed:            seed,
@@ -351,16 +407,27 @@ func Run(req RunRequest) (*PipelineResult, error) {
 		Explanations:    explanations,
 		Forecasts:       forecasts,
 		Feedback: FeedbackDTO{
-			AvgReward:  summary.AvgReward,
-			Count:      summary.Count,
+			AvgReward:  feedbackSummary.AvgReward,
+			Count:      feedbackSummary.Count,
 			RiskWeight: newWeights.RiskWeight,
 			CostWeight: newWeights.CostWeight,
 			Penalty:    newWeights.Penalty,
 		},
 		GitOps:      gitopsStatus,
 		AttackPaths: attackPaths,
-		Stages:      stages,
-		GeneratedAt: startTime.UTC().Format(time.RFC3339),
+		AttackMetrics: AttackMetricsDTO{
+			PathCount:      attackMetrics.PathCount,
+			AvgPathLength:  attackMetrics.AvgPathLength,
+			ReachableNodes: attackMetrics.ReachableNodes,
+		},
+		Summary:          summary,
+		ProjectedSummary: projectedSummary,
+		Stages:           stages,
+		Alerts:           alerts,
+		NodeIntel:        nodeIntel,
+		EdgeInfluence:    edgeInfluence,
+		Negotiations:     negotiations,
+		GeneratedAt:      startTime.UTC().Format(time.RFC3339),
 	}
 
 	SetLatestState(result)
