@@ -45,7 +45,14 @@ def call_llm(prompt: str) -> str:
             max_tokens=800,
         )
 
-        output = completion.choices[0].message.content
+        if not completion.choices:
+            raise ValueError("No choices returned from LLM")
+
+        message = completion.choices[0].message
+        if not message or not message.content:
+            raise ValueError("Empty LLM message")
+
+        output = message.content
         if not output or len(output.strip()) < 10:
             raise ValueError("Empty LLM response")
 

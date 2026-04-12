@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"math"
+	"sort"
 
 	"github.com/diya-suryawanshi/cloud/carbon"
 	"github.com/diya-suryawanshi/cloud/graph-engine/graph"
@@ -42,7 +43,7 @@ func complianceScoreFromGraph(g *graph.Graph, risks map[string]float64) float64 
 	if score < 0 {
 		score = 0
 	}
-	return math.Round(score*100) / 100
+	return roundSummary2(score)
 }
 
 func costRiskFromForecasts(forecasts []ForecastDTO) float64 {
@@ -64,7 +65,7 @@ func costRiskFromForecasts(forecasts []ForecastDTO) float64 {
 	if score < 0 {
 		score = 0
 	}
-	return math.Round(score*100) / 100
+	return roundSummary2(score)
 }
 
 func projectedCostRiskFromGraph(g *graph.Graph, risks map[string]float64) float64 {
@@ -78,7 +79,80 @@ func projectedCostRiskFromGraph(g *graph.Graph, risks map[string]float64) float6
 	if len(g.Nodes) == 0 {
 		return 0
 	}
-	return math.Round((total/float64(len(g.Nodes)))*100) / 100
+	return roundSummary2(total / float64(len(g.Nodes)))
+}
+
+func buildTopCarbonSources(report carbon.Report) []CarbonSourceDTO {
+	if report.Total <= 0 || len(report.Top) == 0 {
+		return []CarbonSourceDTO{}
+	}
+
+	out := make([]CarbonSourceDTO, 0, len(report.Top))
+	for _, item := range report.Top {
+		pct := 0.0
+		if report.Total > 0 {
+			pct = (item.Value / report.Total) * 100
+		}
+
+		out = append(out, CarbonSourceDTO{
+			NodeID:              item.NodeID,
+			Carbon:              roundSummary2(item.Value),
+			PercentContribution: roundSummary2(pct),
+		})
+	}
+	return out
+}
+
+func buildCarbonActionImpact(
+	currentReport carbon.Report,
+	projectedReport carbon.Report,
+	recommendations []RecommendationDTO,
+) []CarbonActionImpactDTO {
+	currentByNode := make(map[string]float64, len(currentReport.Results))
+	for _, item := range currentReport.Results {
+		currentByNode[item.NodeID] = item.Value
+	}
+
+	projectedByNode := make(map[string]float64, len(projectedReport.Results))
+	for _, item := range projectedReport.Results {
+		projectedByNode[item.NodeID] = item.Value
+	}
+
+	selectedByNode := make(map[string]RecommendationDTO)
+	for _, rec := range recommendations {
+		if rec.Status == "APPROVED" || rec.Status == "MODIFIED" {
+			selectedByNode[rec.NodeID] = rec
+		}
+	}
+
+	impacts := make([]CarbonActionImpactDTO, 0, len(selectedByNode))
+	for nodeID, rec := range selectedByNode {
+		before := currentByNode[nodeID]
+		after := projectedByNode[nodeID]
+		reduction := before - after
+
+		if before == 0 && after == 0 {
+			continue
+		}
+
+		impacts = append(impacts, CarbonActionImpactDTO{
+			NodeID:          nodeID,
+			Action:          rec.FinalAction,
+			CarbonBefore:    roundSummary2(before),
+			CarbonAfter:     roundSummary2(after),
+			CarbonReduction: roundSummary2(reduction),
+		})
+	}
+
+	sort.Slice(impacts, func(i, j int) bool {
+		return impacts[i].CarbonReduction > impacts[j].CarbonReduction
+	})
+
+	if len(impacts) > 5 {
+		impacts = impacts[:5]
+	}
+
+	return impacts
 }
 
 func BuildCurrentSummary(
@@ -138,7 +212,7 @@ func BuildCurrentSummary(
 		TotalNodes:          len(g.Nodes),
 		TotalEdges:          len(g.Edges),
 		AttackPathCount:     attack.PathCount,
-		AvgAttackPathLength: math.Round(attack.AvgPathLength*100) / 100,
+		AvgAttackPathLength: roundSummary2(attack.AvgPathLength),
 		ReachableNodes:      attack.ReachableNodes,
 		HighRiskCount:       highRisk,
 		PublicExposureCount: publicExposure,
@@ -147,14 +221,15 @@ func BuildCurrentSummary(
 		RejectedCount:       rejected,
 		UrgentCount:         urgent,
 		BillShockCount:      billShock,
-		CurrentTotalCost:    math.Round(totalCost*100) / 100,
-		Forecast30Total:     math.Round(f30*100) / 100,
-		Forecast90Total:     math.Round(f90*100) / 100,
-		AverageRisk:         math.Round(avgRisk*100) / 100,
-		TotalRisk:           math.Round(totalRisk*100) / 100,
-		CurrentCarbonTotal:  math.Round(carbonReport.Total*100) / 100,
+		CurrentTotalCost:    roundSummary2(totalCost),
+		Forecast30Total:     roundSummary2(f30),
+		Forecast90Total:     roundSummary2(f90),
+		AverageRisk:         roundSummary2(avgRisk),
+		TotalRisk:           roundSummary2(totalRisk),
+		CurrentCarbonTotal:  roundSummary2(carbonReport.Total),
 		ComplianceScore:     complianceScoreFromGraph(g, risks),
 		CostRiskScore:       costRiskFromForecasts(forecasts),
+		TopCarbonSources:    buildTopCarbonSources(carbonReport),
 	}
 }
 
@@ -162,9 +237,10 @@ func BuildProjectedSummary(
 	g *graph.Graph,
 	projectedAttack AttackMetrics,
 	projectedRisks map[string]float64,
+	currentCarbon carbon.Report,
 	projectedCarbon carbon.Report,
-	currentCarbon float64,
 	currentAverageRisk float64,
+	recommendations []RecommendationDTO,
 ) ProjectedSummaryDTO {
 	var projectedCost, totalRisk float64
 	var publicExposure int
@@ -182,8 +258,8 @@ func BuildProjectedSummary(
 		avgRisk = totalRisk / float64(len(g.Nodes))
 	}
 
-	reductionPct := carbon.Compare(currentCarbon, projectedCarbon.Total)
-	greenScore := carbon.GreenScore(currentCarbon, projectedCarbon.Total)
+	reductionPct := carbon.Compare(currentCarbon.Total, projectedCarbon.Total)
+	greenScore := carbon.GreenScore(currentCarbon.Total, projectedCarbon.Total)
 
 	riskReductionPct := 0.0
 	if currentAverageRisk > 0 {
@@ -194,15 +270,21 @@ func BuildProjectedSummary(
 	}
 
 	return ProjectedSummaryDTO{
-		ProjectedTotalCost:        math.Round(projectedCost*100) / 100,
+		ProjectedTotalCost:        roundSummary2(projectedCost),
 		ProjectedAttackPathCount:  projectedAttack.PathCount,
 		ProjectedPublicExposure:   publicExposure,
-		ProjectedAverageRisk:      math.Round(avgRisk*100) / 100,
-		ProjectedCarbonTotal:      math.Round(projectedCarbon.Total*100) / 100,
-		CarbonReductionPct:        math.Round(reductionPct*100) / 100,
-		GreenScore:                math.Round(greenScore*100) / 100,
+		ProjectedAverageRisk:      roundSummary2(avgRisk),
+		ProjectedCarbonTotal:      roundSummary2(projectedCarbon.Total),
+		CarbonReductionPct:        roundSummary2(reductionPct),
+		GreenScore:                roundSummary2(greenScore),
 		ProjectedComplianceScore:  complianceScoreFromGraph(g, projectedRisks),
 		ProjectedCostRiskScore:    projectedCostRiskFromGraph(g, projectedRisks),
-		ProjectedRiskReductionPct: math.Round(riskReductionPct*100) / 100,
+		ProjectedRiskReductionPct: roundSummary2(riskReductionPct),
+		TopCarbonSources:          buildTopCarbonSources(projectedCarbon),
+		CarbonActionImpact:        buildCarbonActionImpact(currentCarbon, projectedCarbon, recommendations),
 	}
+}
+
+func roundSummary2(v float64) float64 {
+	return math.Round(v*100) / 100
 }

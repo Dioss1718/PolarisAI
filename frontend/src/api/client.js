@@ -108,3 +108,8 @@ export async function getGitOpsAudit({ scenario, seed }) {
   const { data } = await api.get(`/gitops/audit?${params.toString()}`);
   return data;
 }
+
+export async function compareWhatIf(payload) {
+  const { data } = await api.post("/compare", payload);
+  return data;
+}

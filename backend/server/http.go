@@ -198,7 +198,36 @@ func Start(addr string) error {
 	mux.HandleFunc("/api/gitops/refresh-pr", requireAuth(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
 		handleGitOpsRefreshPR(w, r, session)
 	}))
+	mux.HandleFunc("/api/compare", requireAuth(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
 
+		if !rbac.CanRunGovernance(session.Role) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "role not allowed to run what-if comparison"})
+			return
+		}
+
+		var req compareRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+			return
+		}
+
+		if req.ManualData != nil && !rbac.CanAccess(session.Role, rbac.FeatureSimulationStudio) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "role not allowed to use simulation studio"})
+			return
+		}
+
+		result, err := runWhatIfCompare(req)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, result)
+	}))
 	return http.ListenAndServe(addr, mux)
 }
 

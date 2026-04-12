@@ -1,9 +1,10 @@
 package orchestrator
 
 type RunRequest struct {
-	Scenario   string                 `json:"scenario"`
-	Seed       int                    `json:"seed"`
-	ManualData map[string]interface{} `json:"manualData,omitempty"`
+	Scenario           string                 `json:"scenario"`
+	Seed               int                    `json:"seed"`
+	ManualData         map[string]interface{} `json:"manualData,omitempty"`
+	SkipExplainability bool                   `json:"skipExplainability,omitempty"`
 }
 
 type GraphNodeDTO struct {
@@ -74,6 +75,20 @@ type FeedbackDTO struct {
 	RiskWeight float64 `json:"riskWeight"`
 	CostWeight float64 `json:"costWeight"`
 	Penalty    float64 `json:"penalty"`
+}
+
+type CarbonSourceDTO struct {
+	NodeID              string  `json:"nodeId"`
+	Carbon              float64 `json:"carbon"`
+	PercentContribution float64 `json:"percentContribution"`
+}
+
+type CarbonActionImpactDTO struct {
+	NodeID          string  `json:"nodeId"`
+	Action          string  `json:"action"`
+	CarbonBefore    float64 `json:"carbonBefore"`
+	CarbonAfter     float64 `json:"carbonAfter"`
+	CarbonReduction float64 `json:"carbonReduction"`
 }
 
 type PipelineStageDTO struct {
@@ -155,39 +170,42 @@ type NegotiationTraceDTO struct {
 }
 
 type SummaryDTO struct {
-	TotalNodes          int     `json:"totalNodes"`
-	TotalEdges          int     `json:"totalEdges"`
-	AttackPathCount     int     `json:"attackPathCount"`
-	AvgAttackPathLength float64 `json:"avgAttackPathLength"`
-	ReachableNodes      int     `json:"reachableNodes"`
-	HighRiskCount       int     `json:"highRiskCount"`
-	PublicExposureCount int     `json:"publicExposureCount"`
-	ApprovedCount       int     `json:"approvedCount"`
-	ModifiedCount       int     `json:"modifiedCount"`
-	RejectedCount       int     `json:"rejectedCount"`
-	UrgentCount         int     `json:"urgentCount"`
-	BillShockCount      int     `json:"billShockCount"`
-	CurrentTotalCost    float64 `json:"currentTotalCost"`
-	Forecast30Total     float64 `json:"forecast30Total"`
-	Forecast90Total     float64 `json:"forecast90Total"`
-	AverageRisk         float64 `json:"averageRisk"`
-	TotalRisk           float64 `json:"totalRisk"`
-	CurrentCarbonTotal  float64 `json:"currentCarbonTotal"`
-	ComplianceScore     float64 `json:"complianceScore"`
-	CostRiskScore       float64 `json:"costRiskScore"`
+	TotalNodes          int               `json:"totalNodes"`
+	TotalEdges          int               `json:"totalEdges"`
+	AttackPathCount     int               `json:"attackPathCount"`
+	AvgAttackPathLength float64           `json:"avgAttackPathLength"`
+	ReachableNodes      int               `json:"reachableNodes"`
+	HighRiskCount       int               `json:"highRiskCount"`
+	PublicExposureCount int               `json:"publicExposureCount"`
+	ApprovedCount       int               `json:"approvedCount"`
+	ModifiedCount       int               `json:"modifiedCount"`
+	RejectedCount       int               `json:"rejectedCount"`
+	UrgentCount         int               `json:"urgentCount"`
+	BillShockCount      int               `json:"billShockCount"`
+	CurrentTotalCost    float64           `json:"currentTotalCost"`
+	Forecast30Total     float64           `json:"forecast30Total"`
+	Forecast90Total     float64           `json:"forecast90Total"`
+	AverageRisk         float64           `json:"averageRisk"`
+	TotalRisk           float64           `json:"totalRisk"`
+	CurrentCarbonTotal  float64           `json:"currentCarbonTotal"`
+	ComplianceScore     float64           `json:"complianceScore"`
+	CostRiskScore       float64           `json:"costRiskScore"`
+	TopCarbonSources    []CarbonSourceDTO `json:"topCarbonSources"`
 }
 
 type ProjectedSummaryDTO struct {
-	ProjectedTotalCost        float64 `json:"projectedTotalCost"`
-	ProjectedAttackPathCount  int     `json:"projectedAttackPathCount"`
-	ProjectedPublicExposure   int     `json:"projectedPublicExposureCount"`
-	ProjectedAverageRisk      float64 `json:"projectedAverageRisk"`
-	ProjectedCarbonTotal      float64 `json:"projectedCarbonTotal"`
-	CarbonReductionPct        float64 `json:"carbonReductionPct"`
-	GreenScore                float64 `json:"greenScore"`
-	ProjectedComplianceScore  float64 `json:"projectedComplianceScore"`
-	ProjectedCostRiskScore    float64 `json:"projectedCostRiskScore"`
-	ProjectedRiskReductionPct float64 `json:"projectedRiskReductionPct"`
+	ProjectedTotalCost        float64                 `json:"projectedTotalCost"`
+	ProjectedAttackPathCount  int                     `json:"projectedAttackPathCount"`
+	ProjectedPublicExposure   int                     `json:"projectedPublicExposureCount"`
+	ProjectedAverageRisk      float64                 `json:"projectedAverageRisk"`
+	ProjectedCarbonTotal      float64                 `json:"projectedCarbonTotal"`
+	CarbonReductionPct        float64                 `json:"carbonReductionPct"`
+	GreenScore                float64                 `json:"greenScore"`
+	ProjectedComplianceScore  float64                 `json:"projectedComplianceScore"`
+	ProjectedCostRiskScore    float64                 `json:"projectedCostRiskScore"`
+	ProjectedRiskReductionPct float64                 `json:"projectedRiskReductionPct"`
+	TopCarbonSources          []CarbonSourceDTO       `json:"topCarbonSources"`
+	CarbonActionImpact        []CarbonActionImpactDTO `json:"carbonActionImpact"`
 }
 
 type PipelineResult struct {

@@ -282,7 +282,20 @@ def explain(data: ExplainRequest):
         )
 
         docs, metas = retrieve(query, data.node_type, data.action)
-        prompt = build_prompt(data.model_dump(), docs)
+        clean_data = {
+    "node_id": str(data.node_id),
+    "action": str(data.action or "SECURE"),
+    "env": str(data.env or "UNKNOWN"),
+    "node_type": str(data.node_type or "RESOURCE"),
+    "cost": float(data.cost or 0),
+    "risk_reduction": float(data.risk_reduction or 0),
+    "sla": float(data.sla or 0),
+    "security": float(data.security or 0),
+    "compliance": float(data.compliance or 0),
+    "blast": float(data.blast or 0),
+}
+
+        prompt = build_prompt(clean_data, docs)
         output = call_llm(prompt)
 
         if not output or len(output.strip()) < 20:

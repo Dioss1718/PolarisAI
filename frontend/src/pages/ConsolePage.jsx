@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   clearSession,
+  compareWhatIf,
   getMe,
   getServiceHealth,
   getSession,
@@ -81,7 +82,6 @@ export default function ConsolePage() {
     setLoginOpen(true);
   };
 
-  // Open login immediately after this page mounts if there is no usable session.
   useEffect(() => {
     let stopped = false;
 
@@ -269,6 +269,15 @@ export default function ConsolePage() {
     await executeRun(manualData);
   };
 
+  const runWhatIfCompare = async (payload) => {
+    if (!session) {
+      setLoginOpen(true);
+      throw new Error("Please log in to run what-if comparison.");
+    }
+
+    return await compareWhatIf(payload);
+  };
+
   const handleLoggedIn = async (newSession) => {
     setErrorMessage("");
     setLoginOpen(false);
@@ -321,7 +330,7 @@ export default function ConsolePage() {
   return (
     <AppShell>
       {workspaceOpen ? (
-                <AnalysisWorkspacePage
+        <AnalysisWorkspacePage
           activeTab={workspaceTab}
           setActiveTab={setWorkspaceTab}
           state={state}
@@ -348,51 +357,46 @@ export default function ConsolePage() {
           }}
         />
       ) : (
-        <div className="grid min-h-screen grid-rows-[94px_auto_1fr] gap-3 overflow-x-hidden px-0 pb-24">
-          <HeaderBar
-            scenario={scenario}
-            setScenario={setScenario}
-            seed={seed}
-            setSeed={setSeed}
-            onRun={runScenario}
-            loading={loading}
-            onOpenLogin={() => setLoginOpen(true)}
-            session={session}
-            onLogout={logout}
-            onOpenWorkspace={openWorkspaceTab}
-          />
+        <div className="pb-24">
+          <div className="space-y-3">
+            <HeaderBar
+              scenario={scenario}
+              setScenario={setScenario}
+              seed={seed}
+              setSeed={setSeed}
+              onRun={runScenario}
+              loading={loading}
+              onOpenLogin={() => setLoginOpen(true)}
+              session={session}
+              onLogout={logout}
+              onOpenWorkspace={openWorkspaceTab}
+            />
 
-          <MetaBar
-            metrics={metrics}
-            scenario={state.scenario || scenario}
-            seed={state.seed ?? seed}
-            services={services}
-            gitops={state.gitops}
-            onOpenWorkspace={openWorkspaceTab}
-            highlightGraphNav={highlightGraphNav}
-          />
+            <MetaBar
+              metrics={metrics}
+              scenario={state.scenario || scenario}
+              seed={state.seed ?? seed}
+              services={services}
+              gitops={state.gitops}
+              onOpenWorkspace={openWorkspaceTab}
+              highlightGraphNav={highlightGraphNav}
+            />
 
-          <div className="grid min-h-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,0.52fr)_minmax(700px,0.48fr)]">
-    
-    
-            <div className="min-h-[460px]">
+            <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,0.52fr)_minmax(700px,0.48fr)]">
               <TopGovernanceActionsPanel
                 recommendations={state.recommendations}
                 onOpenWorkspace={openWorkspaceTab}
               />
-            </div>
 
-            
-            <div className="min-h-[460px] w-full">
               <SimulationStudio
-                onRunManual={runManual}
-                loading={loading}
-                allowed={simulationAllowed}
-              />
+              state={state}
+              onCompare={runWhatIfCompare}
+              loading={loading}
+              allowed={simulationAllowed}
+              scenario={state.scenario || scenario}
+              seed={state.seed ?? seed}
+            />
             </div>
-
- 
-
           </div>
         </div>
       )}
@@ -418,6 +422,12 @@ export default function ConsolePage() {
         }}
         onLoggedIn={handleLoggedIn}
       />
+
+      {errorMessage ? (
+        <div className="fixed bottom-16 left-4 z-[120] max-w-lg rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 shadow-lg backdrop-blur">
+          {errorMessage}
+        </div>
+      ) : null}
     </AppShell>
   );
 }
@@ -428,7 +438,7 @@ function TopGovernanceActionsPanel({ recommendations = [], onOpenWorkspace }) {
     .slice(0, 6);
 
   return (
-    <div className="min-h-[420px] rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-lg font-semibold">Top Governance Actions</div>
@@ -445,7 +455,7 @@ function TopGovernanceActionsPanel({ recommendations = [], onOpenWorkspace }) {
         </button>
       </div>
 
-      <div className="mt-4 max-h-[360px] overflow-auto pr-1">
+      <div className="mt-4 h-[520px] overflow-auto pr-1">
         {top.length === 0 ? (
           <div className="rounded-xl border border-white/10 bg-slate-950/60 p-4 text-sm text-slate-400">
             No governance actions available yet.
@@ -470,7 +480,9 @@ function TopGovernanceActionsPanel({ recommendations = [], onOpenWorkspace }) {
                   </div>
                 </div>
 
-                <div className="mt-3 text-sm text-slate-300">{r.reason}</div>
+                <div className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-300">
+                  {r.reason}
+                </div>
               </div>
             ))}
           </div>

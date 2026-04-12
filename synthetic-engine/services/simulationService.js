@@ -13,7 +13,24 @@ const mutateTopology = require("../mutators/topologyMutator");
 const mutateExposure = require("../mutators/exposureMutator");
 const mutateIAM = require("../mutators/iamMutator");
 
-const datasetPath = path.join(__dirname, "../../data/cloud_env.json");
+function resolveDatasetPath() {
+  const candidates = [
+    path.join(__dirname, "../../data/cloud_env.json"),
+    path.join(__dirname, "../../Data/cloud_env.json"),
+    path.join(process.cwd(), "data/cloud_env.json"),
+    path.join(process.cwd(), "Data/cloud_env.json"),
+  ];
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+
+  throw new Error(
+    `cloud_env.json not found. Checked: ${candidates.join(" | ")}`
+  );
+}
 
 function initializeExpectedIssues(data) {
   data.expected_issues = [];
@@ -22,12 +39,12 @@ function initializeExpectedIssues(data) {
 }
 
 function deriveExpectedIssues(data) {
-  data.nodes.forEach(node => {
+  data.nodes.forEach((node) => {
     if (node.exposure === "PUBLIC" && node.criticality >= 8) {
       data.expected_issues.push({
         node_id: node.id,
         issue_type: "HIGH_RISK_EXPOSURE",
-        severity: "HIGH"
+        severity: "HIGH",
       });
     }
 
@@ -35,15 +52,18 @@ function deriveExpectedIssues(data) {
       data.expected_issues.push({
         node_id: node.id,
         issue_type: "COST_ANOMALY",
-        severity: "HIGH"
+        severity: "HIGH",
       });
     }
 
-    if (node.type === "IAM_ROLE" && (node.compliance_flags || []).includes("ADMIN_ACCESS")) {
+    if (
+      node.type === "IAM_ROLE" &&
+      (node.compliance_flags || []).includes("ADMIN_ACCESS")
+    ) {
       data.expected_issues.push({
         node_id: node.id,
         issue_type: "IAM_ESCALATION",
-        severity: "HIGH"
+        severity: "HIGH",
       });
     }
   });
@@ -58,6 +78,7 @@ function runSimulation(options = {}) {
     const scenarioConfig = scenarios[scenario] || scenarios.FULL_CHAOS;
     const random = createSeededRandom(seed);
 
+    const datasetPath = resolveDatasetPath();
     const rawData = JSON.parse(fs.readFileSync(datasetPath, "utf-8"));
     let data = deepClone(rawData);
 
@@ -93,9 +114,10 @@ function runSimulation(options = {}) {
     data.simulation_metadata = {
       scenario,
       seed,
+      dataset_path: datasetPath,
       mutations_applied: Object.entries(scenarioConfig)
         .filter(([, enabled]) => enabled)
-        .map(([k]) => k)
+        .map(([k]) => k),
     };
 
     return data;
@@ -103,7 +125,7 @@ function runSimulation(options = {}) {
     console.error("Simulation Error:", error.message);
     return {
       error: "Failed to run simulation",
-      details: error.message
+      details: error.message,
     };
   }
 }

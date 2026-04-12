@@ -135,8 +135,12 @@ func Run(req RunRequest) (*PipelineResult, error) {
 
 	blastMap := computeBlastRadius(g)
 	policyInputs := make([]policyvalidator.InputDecision, 0, len(decisions))
+
 	for _, d := range decisions {
-		srcAction := actionLookup[d.NodeID+"|"+d.Action]
+		srcAction, ok := actionLookup[d.NodeID+"|"+d.Action]
+		if !ok {
+			continue
+		}
 
 		policyInputs = append(policyInputs, policyvalidator.InputDecision{
 			NodeID:        d.NodeID,
@@ -161,7 +165,11 @@ func Run(req RunRequest) (*PipelineResult, error) {
 	var forecasts []ForecastDTO
 
 	for _, d := range decisions {
-		node := g.Nodes[d.NodeID]
+		node, nodeExists := g.Nodes[d.NodeID]
+		if !nodeExists {
+			continue
+		}
+
 		risk := nodeRisks[d.NodeID]
 
 		validation, ok := validatedLookup[d.NodeID+"|"+d.Action]
@@ -180,12 +188,16 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			}
 		}
 
+		srcAction, ok := actionLookup[d.NodeID+"|"+d.Action]
+		if !ok {
+			continue
+		}
+
 		scores := validation.Scores
 		finalScore := validation.Score
 		status := validation.Status
 		finalAction := validation.FinalAction
 
-		srcAction := actionLookup[d.NodeID+"|"+d.Action]
 		confidence := deriveConfidence(srcAction.Score, finalScore, node.Environment)
 		safetyLevel := deriveSafetyLevel(node.Environment, node.Exposure, finalScore)
 
@@ -223,32 +235,32 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			Reason:      validation.Reason,
 		})
 
-		if src, ok := actionLookup[d.NodeID+"|"+d.Action]; ok {
-			approvedActions = append(approvedActions, src)
-		}
+		approvedActions = append(approvedActions, srcAction)
 
-		explainReq := aiexplain.AIRequest{
-			NodeID:        d.NodeID,
-			Action:        finalAction,
-			Env:           node.Environment,
-			NodeType:      node.Type,
-			Cost:          srcAction.CostDelta,
-			RiskReduction: srcAction.RiskReduction,
-			SLA:           scores.SLA,
-			Security:      scores.Security,
-			Compliance:    scores.Compliance,
-			Blast:         scores.Blast,
-		}
+		if !req.SkipExplainability {
+			explainReq := aiexplain.AIRequest{
+				NodeID:        d.NodeID,
+				Action:        finalAction,
+				Env:           node.Environment,
+				NodeType:      node.Type,
+				Cost:          srcAction.CostDelta,
+				RiskReduction: srcAction.RiskReduction,
+				SLA:           scores.SLA,
+				Security:      scores.Security,
+				Compliance:    scores.Compliance,
+				Blast:         scores.Blast,
+			}
 
-		explanationResp, err := aiexplain.GetExplanation(explainReq)
-		if err == nil {
-			explanations = append(explanations, ExplanationDTO{
-				NodeID:      d.NodeID,
-				Action:      finalAction,
-				Explanation: explanationResp.Explanation,
-				Grounded:    explanationResp.Grounded,
-				Sources:     explanationResp.Sources,
-			})
+			explanationResp, err := aiexplain.GetExplanation(explainReq)
+			if err == nil {
+				explanations = append(explanations, ExplanationDTO{
+					NodeID:      d.NodeID,
+					Action:      finalAction,
+					Explanation: explanationResp.Explanation,
+					Grounded:    explanationResp.Grounded,
+					Sources:     explanationResp.Sources,
+				})
+			}
 		}
 
 		if f, err := forecast.Get(d.NodeID); err == nil {
@@ -263,10 +275,15 @@ func Run(req RunRequest) (*PipelineResult, error) {
 		}
 	}
 
+	explainabilityStatus := "complete"
+	if req.SkipExplainability {
+		explainabilityStatus = "skipped"
+	}
+
 	stages = append(stages,
 		PipelineStageDTO{Name: "Policy Validator", Status: "complete"},
 		PipelineStageDTO{Name: "Forecast", Status: "complete"},
-		PipelineStageDTO{Name: "Explainability", Status: "complete"},
+		PipelineStageDTO{Name: "Explainability", Status: explainabilityStatus},
 	)
 
 	gitopsStatus := GitOpsDTO{
@@ -276,6 +293,7 @@ func Run(req RunRequest) (*PipelineResult, error) {
 	}
 
 	stages = append(stages, PipelineStageDTO{Name: "GitOps", Status: "pending_approval"})
+
 	records := feedback.Load()
 	for _, a := range approvedActions {
 		record := feedback.CreateRecord(
@@ -354,9 +372,10 @@ func Run(req RunRequest) (*PipelineResult, error) {
 		projectedGraph,
 		projectedAttackMetrics,
 		projectedRisks,
+		currentCarbon,
 		projectedCarbon,
-		currentCarbon.Total,
 		summary.AverageRisk,
+		recommendations,
 	)
 
 	nodeIntel := buildNodeIntel(g, nodeRisks, attackPaths, forecasts)
