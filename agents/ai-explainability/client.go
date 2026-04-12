@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -35,46 +36,51 @@ var httpClient = &http.Client{
 
 func getExplainURL() string {
 	if v := os.Getenv("AI_ENGINE_URL"); v != "" {
-		return v + "/explain"
+		return strings.TrimRight(v, "/") + "/explain"
 	}
 	return "http://localhost:8000/explain"
 }
 
-func GetExplanation(req AIRequest) (string, error) {
+func GetExplanation(req AIRequest) (AIResponse, error) {
 	jsonData, err := json.Marshal(req)
 	if err != nil {
-		return "", fmt.Errorf("marshal error: %w", err)
+		return AIResponse{}, fmt.Errorf("marshal error: %w", err)
 	}
 
-	httpReq, err := http.NewRequest("POST", getExplainURL(), bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequest(http.MethodPost, getExplainURL(), bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", fmt.Errorf("request build error: %w", err)
+		return AIResponse{}, fmt.Errorf("request build error: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		return "", fmt.Errorf("AI service unreachable: %w", err)
+		return AIResponse{}, fmt.Errorf("AI service unreachable: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("read error: %w", err)
+		return AIResponse{}, fmt.Errorf("read error: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("AI error: %s", string(body))
+		return AIResponse{}, fmt.Errorf("AI error: %s", string(body))
 	}
 
 	var result AIResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("decode error: %w | raw: %s", err, string(body))
+		return AIResponse{}, fmt.Errorf("decode error: %w | raw: %s", err, string(body))
 	}
 
+	result.Explanation = strings.TrimSpace(result.Explanation)
 	if result.Explanation == "" {
-		return "", fmt.Errorf("empty explanation from AI")
+		return AIResponse{}, fmt.Errorf("empty explanation from AI")
 	}
 
-	return result.Explanation, nil
+	if result.Sources == nil {
+		result.Sources = []string{}
+	}
+
+	return result, nil
 }

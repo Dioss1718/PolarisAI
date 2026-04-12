@@ -102,6 +102,7 @@ export default function AnalysisWorkspacePage({
   activeTab,
   setActiveTab,
   state,
+  session,
   onBack,
   onSelectNode,
   onSelectPath,
@@ -110,6 +111,7 @@ export default function AnalysisWorkspacePage({
   selectedRecommendation,
   selectedForecast,
   selectedAttackPath,
+  onRefreshState,
 }) {
   return (
     <div className="grid h-full grid-rows-[auto_1fr] gap-3">
@@ -182,7 +184,15 @@ export default function AnalysisWorkspacePage({
           <ForecastPanel forecasts={state.forecasts} onSelect={onSelectNode} />
         )}
 
-        {activeTab === "gitops" && <GitOpsPanel gitops={state.gitops} />}
+                {activeTab === "gitops" && (
+          <GitOpsPanel
+            gitops={state.gitops}
+            session={session}
+            scenario={state.scenario}
+            seed={state.seed}
+            onRefreshState={onRefreshState}
+          />
+        )}
 
         {activeTab === "feedback" && <FeedbackPanel feedback={state.feedback} />}
 

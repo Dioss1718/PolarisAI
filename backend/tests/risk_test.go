@@ -28,7 +28,10 @@ func TestRiskComputation(t *testing.T) {
 		"edges": []interface{}{},
 	}
 
-	g := builder.BuildGraph(input)
+	g, err := builder.BuildGraph(input)
+	if err != nil {
+		t.Fatalf("unexpected graph build error: %v", err)
+	}
 
 	risks := riskengine.ComputeNodeRisk(g)
 

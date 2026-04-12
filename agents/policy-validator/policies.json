@@ -1,6 +1,6 @@
 {
-  "MaxDowntime": 0.02,
-  "NoTerminateProd": true,
-  "NoPublicDB": true,
-  "EncryptionRequired": true
+  "maxDowntime": 0.02,
+  "noTerminateProd": true,
+  "noPublicDB": true,
+  "encryptionRequired": true
 }

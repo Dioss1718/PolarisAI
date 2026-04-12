@@ -13,7 +13,7 @@ const mutateTopology = require("../mutators/topologyMutator");
 const mutateExposure = require("../mutators/exposureMutator");
 const mutateIAM = require("../mutators/iamMutator");
 
-const datasetPath = path.join(__dirname, "../../Data/cloud_env.json");
+const datasetPath = path.join(__dirname, "../../data/cloud_env.json");
 
 function initializeExpectedIssues(data) {
   data.expected_issues = [];

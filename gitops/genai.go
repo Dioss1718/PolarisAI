@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -29,6 +31,13 @@ var infraHTTPClient = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
+func getInfraURL() string {
+	if v := os.Getenv("AI_ENGINE_URL"); v != "" {
+		return strings.TrimRight(v, "/") + "/infra"
+	}
+	return "http://localhost:8000/infra"
+}
+
 func GenerateInfraCode(diff Diff, d Decision) InfraCode {
 	reqBody := infraRequest{
 		NodeID:  d.NodeID,
@@ -44,7 +53,7 @@ func GenerateInfraCode(diff Diff, d Decision) InfraCode {
 	}
 
 	resp, err := infraHTTPClient.Post(
-		"http://localhost:8000/infra",
+		getInfraURL(),
 		"application/json",
 		bytes.NewBuffer(body),
 	)
@@ -67,30 +76,39 @@ func GenerateInfraCode(diff Diff, d Decision) InfraCode {
 		return fallbackInfraCode(d)
 	}
 
-	if out.Code == "" {
+	if strings.TrimSpace(out.Code) == "" {
 		return fallbackInfraCode(d)
 	}
 
-	format := out.Format
+	format := strings.TrimSpace(out.Format)
 	if format == "" {
 		format = "terraform"
 	}
 
-	return InfraCode{
+	code := InfraCode{
 		Content: out.Code,
 		Format:  format,
 	}
+
+	if err := ValidateInfraCodeForGitOps(code); err != nil {
+		return fallbackInfraCode(d)
+	}
+
+	return code
 }
 
 func fallbackInfraCode(d Decision) InfraCode {
 	return InfraCode{
-		Content: fmt.Sprintf(`
-resource "null_resource" "%s" {
-  provisioner "local-exec" {
-    command = "echo applied %s"
-  }
+		Content: fmt.Sprintf(`# PolarisAI fallback IaC stub
+# Node: %s
+# Action: %s
+# This fallback is intentionally non-executable and requires human review.
+
+locals {
+  polaris_node   = %q
+  polaris_action = %q
 }
-`, d.NodeID, d.FinalAction),
+`, d.NodeID, d.FinalAction, d.NodeID, d.FinalAction),
 		Format: "terraform",
 	}
 }

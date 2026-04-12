@@ -7,12 +7,13 @@ import (
 	"github.com/diya-suryawanshi/cloud/graph-engine/graph"
 )
 
-// FindAttackPaths discovers possible attack paths
-// from attacker entry points to sensitive targets.
 func FindAttackPaths(g *graph.Graph) [][]string {
 	var allPaths [][]string
 
 	for _, node := range g.Nodes {
+		if !isActiveNode(node.Exposure, node.Utilization, node.Cost) {
+			continue
+		}
 		if isEntryPoint(node.Type, node.Exposure) {
 			paths := BFSWithTarget(g, node.ID)
 			allPaths = append(allPaths, paths...)
@@ -22,10 +23,13 @@ func FindAttackPaths(g *graph.Graph) [][]string {
 	return deduplicatePaths(allPaths)
 }
 
-// BFSWithTarget explores multiple valid attack paths from a start node
-// to sensitive targets, without prematurely blocking alternate paths.
 func BFSWithTarget(g *graph.Graph, start string) [][]string {
 	var result [][]string
+
+	startNode, ok := g.Nodes[start]
+	if !ok || !isActiveNode(startNode.Exposure, startNode.Utilization, startNode.Cost) {
+		return result
+	}
 
 	queue := [][]string{{start}}
 	maxDepth := len(g.Nodes) + 2
@@ -39,6 +43,10 @@ func BFSWithTarget(g *graph.Graph, start string) [][]string {
 		}
 
 		current := path[len(path)-1]
+		currentNode, ok := g.Nodes[current]
+		if !ok || !isActiveNode(currentNode.Exposure, currentNode.Utilization, currentNode.Cost) {
+			continue
+		}
 
 		if isSensitiveNode(g, current) && current != start {
 			result = append(result, path)
@@ -46,6 +54,10 @@ func BFSWithTarget(g *graph.Graph, start string) [][]string {
 		}
 
 		for _, neighbor := range g.Adjacency[current] {
+			neighborNode, ok := g.Nodes[neighbor.To]
+			if !ok || !isActiveNode(neighborNode.Exposure, neighborNode.Utilization, neighborNode.Cost) {
+				continue
+			}
 			if containsNode(path, neighbor.To) {
 				continue
 			}
@@ -64,7 +76,13 @@ func isEntryPoint(nodeType, exposure string) bool {
 }
 
 func isSensitiveNode(g *graph.Graph, nodeID string) bool {
-	node := g.Nodes[nodeID]
+	node, ok := g.Nodes[nodeID]
+	if !ok {
+		return false
+	}
+	if !isActiveNode(node.Exposure, node.Utilization, node.Cost) {
+		return false
+	}
 
 	if node.Type == "DATABASE" {
 		return true
@@ -79,6 +97,13 @@ func isSensitiveNode(g *graph.Graph, nodeID string) bool {
 	}
 
 	return false
+}
+
+func isActiveNode(exposure string, utilization, cost float64) bool {
+	if exposure == "PRIVATE" && utilization == 0 && cost == 0 {
+		return false
+	}
+	return true
 }
 
 func containsNode(path []string, target string) bool {

@@ -52,9 +52,11 @@ type RecommendationDTO struct {
 }
 
 type ExplanationDTO struct {
-	NodeID      string `json:"nodeId"`
-	Action      string `json:"action"`
-	Explanation string `json:"explanation"`
+	NodeID      string   `json:"nodeId"`
+	Action      string   `json:"action"`
+	Explanation string   `json:"explanation"`
+	Grounded    bool     `json:"grounded"`
+	Sources     []string `json:"sources"`
 }
 
 type ForecastDTO struct {
@@ -80,13 +82,18 @@ type PipelineStageDTO struct {
 }
 
 type GitOpsPRDTO struct {
-	URL      string `json:"url"`
-	Status   string `json:"status"`
-	PRNumber int    `json:"prNumber"`
-	Branch   string `json:"branch"`
-	NodeID   string `json:"nodeId"`
-	Action   string `json:"action"`
-	Message  string `json:"message"`
+	ApprovalID    string `json:"approvalId"`
+	URL           string `json:"url"`
+	Status        string `json:"status"`
+	PRNumber      int    `json:"prNumber"`
+	Branch        string `json:"branch"`
+	NodeID        string `json:"nodeId"`
+	Action        string `json:"action"`
+	Message       string `json:"message"`
+	RequestedAt   string `json:"requestedAt,omitempty"`
+	ReviewedAt    string `json:"reviewedAt,omitempty"`
+	ReviewedBy    string `json:"reviewedBy,omitempty"`
+	ReviewComment string `json:"reviewComment,omitempty"`
 }
 
 type GitOpsDTO struct {

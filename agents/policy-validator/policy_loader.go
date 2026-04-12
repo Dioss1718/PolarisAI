@@ -3,28 +3,47 @@ package policyvalidator
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
+func defaultPolicy() Policy {
+	return Policy{
+		MaxDowntime:        0.02,
+		NoTerminateProd:    true,
+		NoPublicDB:         true,
+		EncryptionRequired: true,
+	}
+}
+
 func LoadPolicy() Policy {
-	file, err := os.ReadFile("agents/policy-validator/policies.json")
-	if err != nil {
-		return Policy{
-			MaxDowntime:        0.02,
-			NoTerminateProd:    true,
-			NoPublicDB:         true,
-			EncryptionRequired: true,
-		}
+	candidates := []string{
+		filepath.Join("agents", "policy-validator", "policies.json"),
+		filepath.Join(".", "agents", "policy-validator", "policies.json"),
+		filepath.Join("..", "agents", "policy-validator", "policies.json"),
+		filepath.Join("..", "..", "agents", "policy-validator", "policies.json"),
 	}
 
-	var p Policy
-	if err := json.Unmarshal(file, &p); err != nil {
-		return Policy{
-			MaxDowntime:        0.02,
-			NoTerminateProd:    true,
-			NoPublicDB:         true,
-			EncryptionRequired: true,
-		}
+	if cwd, err := os.Getwd(); err == nil {
+		candidates = append(candidates,
+			filepath.Join(cwd, "agents", "policy-validator", "policies.json"),
+			filepath.Join(cwd, "..", "agents", "policy-validator", "policies.json"),
+			filepath.Join(cwd, "..", "..", "agents", "policy-validator", "policies.json"),
+		)
 	}
 
-	return p
+	for _, path := range candidates {
+		file, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		var p Policy
+		if err := json.Unmarshal(file, &p); err != nil {
+			continue
+		}
+
+		return p
+	}
+
+	return defaultPolicy()
 }

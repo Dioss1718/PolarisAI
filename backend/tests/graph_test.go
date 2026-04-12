@@ -40,7 +40,10 @@ func TestGraphBuild(t *testing.T) {
 		"edges": []interface{}{},
 	}
 
-	g := builder.BuildGraph(input)
+	g, err := builder.BuildGraph(input)
+	if err != nil {
+		t.Fatalf("unexpected graph build error: %v", err)
+	}
 
 	if len(g.Nodes) != 2 {
 		t.Errorf("expected 2 nodes, got %d", len(g.Nodes))

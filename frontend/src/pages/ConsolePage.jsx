@@ -321,10 +321,11 @@ export default function ConsolePage() {
   return (
     <AppShell>
       {workspaceOpen ? (
-        <AnalysisWorkspacePage
+                <AnalysisWorkspacePage
           activeTab={workspaceTab}
           setActiveTab={setWorkspaceTab}
           state={state}
+          session={session}
           onBack={() => setWorkspaceOpen(false)}
           onSelectNode={setSelectedNodeId}
           onSelectPath={setSelectedPathIndex}
@@ -336,6 +337,15 @@ export default function ConsolePage() {
           onRunManual={runManual}
           loading={loading}
           simulationAllowed={simulationAllowed}
+          onRefreshState={async () => {
+            const data = await getState({
+              scenario: state.scenario || scenario,
+              seed: state.seed ?? seed,
+            });
+            if (data) {
+              hydrateState(data);
+            }
+          }}
         />
       ) : (
         <div className="grid min-h-screen grid-rows-[94px_auto_1fr] gap-3 overflow-x-hidden px-0 pb-24">

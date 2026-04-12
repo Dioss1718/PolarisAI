@@ -80,3 +80,31 @@ export async function getServiceHealth() {
   const { data } = await api.get("/health");
   return data;
 }
+
+export async function askCopilot(payload) {
+  const { data } = await api.post("/copilot", payload);
+  return data;
+}
+
+export async function approveGitOps(payload) {
+  const { data } = await api.post("/gitops/approve", payload);
+  return data;
+}
+
+export async function rejectGitOps(payload) {
+  const { data } = await api.post("/gitops/reject", payload);
+  return data;
+}
+
+export async function refreshGitOpsPR(payload) {
+  const { data } = await api.post("/gitops/refresh-pr", payload);
+  return data;
+}
+
+export async function getGitOpsAudit({ scenario, seed }) {
+  const params = new URLSearchParams();
+  if (scenario) params.set("scenario", scenario);
+  if (seed !== undefined && seed !== null) params.set("seed", String(seed));
+  const { data } = await api.get(`/gitops/audit?${params.toString()}`);
+  return data;
+}

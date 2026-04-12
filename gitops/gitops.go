@@ -29,15 +29,16 @@ func RunGitOps(
 		}
 
 		code := GenerateInfraCode(diff, d)
-		pr := CreatePR(code, d, current)
+		pr := CreatePR(code, d, diff)
 
 		pr.NodeID = d.NodeID
 		pr.Action = d.FinalAction
-
 		responses = append(responses, pr)
 
 		if pr.PRNumber != 0 {
 			log.Printf("[GitOps] PR created for Node=%s | PR #%d", d.NodeID, pr.PRNumber)
+		} else {
+			log.Printf("[GitOps] PR not created for Node=%s | status=%s | reason=%s", d.NodeID, pr.Status, pr.Message)
 		}
 	}
 

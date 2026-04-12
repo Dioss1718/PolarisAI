@@ -9,62 +9,62 @@ import (
 	"time"
 )
 
-func WaitForPRMerge(prNumber int, branch string) bool {
+func GetPRStatus(prNumber int) (string, bool, error) {
 	token := os.Getenv("GITHUB_TOKEN")
 	repo := os.Getenv("GITHUB_REPO")
 
 	if token == "" || repo == "" {
-		fmt.Println("Missing GitHub ENV (TOKEN/REPO)")
-		return false
+		return "", false, fmt.Errorf("missing GITHUB_TOKEN or GITHUB_REPO")
 	}
 
 	url := fmt.Sprintf("https://api.github.com/repos/%s/pulls/%d", repo, prNumber)
 
-	fmt.Printf("\nWaiting for PR #%d (branch: %s)\n", prNumber, branch)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
 
-	maxAttempts := 24 // ~2 minutes at 5s interval
+	resp, err := githubHTTPClient.Do(req)
+	if err != nil {
+		return "", false, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 300 {
+		return "", false, fmt.Errorf("github pr status check failed: %s", string(body))
+	}
+
+	var result struct {
+		State  string `json:"state"`
+		Merged bool   `json:"merged"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", false, err
+	}
+
+	return result.State, result.Merged, nil
+}
+
+func WaitForPRMerge(prNumber int, branch string) bool {
+	maxAttempts := 24
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Accept", "application/vnd.github+json")
-
-		resp, err := githubHTTPClient.Do(req)
+		state, merged, err := GetPRStatus(prNumber)
 		if err != nil {
-			fmt.Println("API error, retrying...")
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-
-		if resp.StatusCode >= 300 {
-			fmt.Println("GitHub status check failed, retrying...")
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
-		var result struct {
-			State  string `json:"state"`
-			Merged bool   `json:"merged"`
-		}
-		json.Unmarshal(body, &result)
-
-		fmt.Printf("PR #%d status -> state=%s merged=%v\n", prNumber, result.State, result.Merged)
-
-		if result.Merged {
-			fmt.Printf("PR #%d MERGED\n", prNumber)
+		if merged {
 			return true
 		}
 
-		if result.State == "closed" && !result.Merged {
-			fmt.Printf("PR #%d REJECTED (closed without merge)\n", prNumber)
+		if state == "closed" && !merged {
 			return false
 		}
 
 		time.Sleep(5 * time.Second)
 	}
 
-	fmt.Printf("PR #%d merge wait timed out\n", prNumber)
 	return false
 }

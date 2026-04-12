@@ -15,7 +15,7 @@ import (
 	securitysentinel "github.com/diya-suryawanshi/cloud/agents/security-sentinel"
 	riskengine "github.com/diya-suryawanshi/cloud/agents/security-sentinel/risk-engine"
 	feedback "github.com/diya-suryawanshi/cloud/backend/feedback"
-	pluginpkg "github.com/diya-suryawanshi/cloud/backend/plugin"
+
 	"github.com/diya-suryawanshi/cloud/carbon"
 	forecast "github.com/diya-suryawanshi/cloud/forecast"
 	gitops "github.com/diya-suryawanshi/cloud/gitops"
@@ -56,7 +56,10 @@ func Run(req RunRequest) (*PipelineResult, error) {
 		}
 	}
 
-	g := builder.BuildGraph(parsed)
+	g, err := builder.BuildGraph(parsed)
+	if err != nil {
+		return nil, fmt.Errorf("invalid graph input: %w", err)
+	}
 
 	stages := []PipelineStageDTO{
 		{Name: "Graph Build", Status: "complete"},
@@ -130,14 +133,26 @@ func Run(req RunRequest) (*PipelineResult, error) {
 	)
 	stages = append(stages, PipelineStageDTO{Name: "Pareto Optimizer", Status: "complete"})
 
-	policy := policyvalidator.Policy{
-		MaxDowntime:        2.0,
-		NoTerminateProd:    true,
-		NoPublicDB:         true,
-		EncryptionRequired: true,
+	blastMap := computeBlastRadius(g)
+	policyInputs := make([]policyvalidator.InputDecision, 0, len(decisions))
+	for _, d := range decisions {
+		srcAction := actionLookup[d.NodeID+"|"+d.Action]
+
+		policyInputs = append(policyInputs, policyvalidator.InputDecision{
+			NodeID:        d.NodeID,
+			Action:        d.Action,
+			CostDelta:     srcAction.CostDelta,
+			RiskReduction: srcAction.RiskReduction,
+		})
 	}
 
-	blastMap := computeBlastRadius(g)
+	validatedDecisions := policyvalidator.RunPolicyValidator(g, policyInputs, nodeRisks)
+
+	validatedLookup := make(map[string]policyvalidator.ValidatedDecision, len(validatedDecisions))
+	for _, vd := range validatedDecisions {
+		key := vd.NodeID + "|" + vd.Action
+		validatedLookup[key] = vd
+	}
 
 	var recommendations []RecommendationDTO
 	var decisionsGitops []gitops.Decision
@@ -147,55 +162,28 @@ func Run(req RunRequest) (*PipelineResult, error) {
 
 	for _, d := range decisions {
 		node := g.Nodes[d.NodeID]
+		risk := nodeRisks[d.NodeID]
 
-		inDegree := 0
-		for _, edges := range g.Adjacency {
-			for _, e := range edges {
-				if e.To == d.NodeID {
-					inDegree++
-				}
+		validation, ok := validatedLookup[d.NodeID+"|"+d.Action]
+		if !ok {
+			validation = policyvalidator.ValidatedDecision{
+				Status:      "REJECTED",
+				FinalAction: d.Action,
+				Score:       0,
+				Reason:      "Policy validation missing for action",
+				Scores: policyvalidator.ValidationScores{
+					SLA:        0,
+					Security:   0,
+					Compliance: 0,
+					Blast:      0,
+				},
 			}
 		}
 
-		outDegree := len(g.Adjacency[d.NodeID])
-		centrality := float64(inDegree*2+outDegree) / 10.0
-		if centrality > 1.0 {
-			centrality = 1.0
-		}
-
-		risk := nodeRisks[d.NodeID]
-
-		input := policyvalidator.InputDecision{
-			NodeID:        d.NodeID,
-			Action:        d.Action,
-			CostDelta:     0,
-			RiskReduction: 0,
-		}
-
-		scores := policyvalidator.ValidateAll(
-			input,
-			policy,
-			node.Environment,
-			node.Type,
-			node.Exposure,
-			centrality,
-			risk,
-		)
-
-		finalScore := 0.3*scores.SLA +
-			0.3*scores.Security +
-			0.2*scores.Compliance +
-			0.2*scores.Blast
-
-		status := "APPROVED"
-		finalAction := d.Action
-
-		if finalScore < 0.4 {
-			status = "REJECTED"
-		} else if finalScore < 0.7 {
-			status = "MODIFIED"
-			finalAction = "SAFE_" + d.Action
-		}
+		scores := validation.Scores
+		finalScore := validation.Score
+		status := validation.Status
+		finalAction := validation.FinalAction
 
 		srcAction := actionLookup[d.NodeID+"|"+d.Action]
 		confidence := deriveConfidence(srcAction.Score, finalScore, node.Environment)
@@ -207,7 +195,7 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			FinalAction:    finalAction,
 			Status:         status,
 			Score:          round2(finalScore),
-			Reason:         d.Reason,
+			Reason:         d.Reason + " | " + validation.Reason,
 			Risk:           round2(risk),
 			Cloud:          node.Cloud,
 			Type:           node.Type,
@@ -232,7 +220,7 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			Action:      d.Action,
 			FinalAction: finalAction,
 			Score:       finalScore,
-			Reason:      "Policy Approved",
+			Reason:      validation.Reason,
 		})
 
 		if src, ok := actionLookup[d.NodeID+"|"+d.Action]; ok {
@@ -245,19 +233,21 @@ func Run(req RunRequest) (*PipelineResult, error) {
 			Env:           node.Environment,
 			NodeType:      node.Type,
 			Cost:          srcAction.CostDelta,
-			RiskReduction: d.Score,
+			RiskReduction: srcAction.RiskReduction,
 			SLA:           scores.SLA,
 			Security:      scores.Security,
 			Compliance:    scores.Compliance,
 			Blast:         scores.Blast,
 		}
 
-		explanation, err := aiexplain.GetExplanation(explainReq)
+		explanationResp, err := aiexplain.GetExplanation(explainReq)
 		if err == nil {
 			explanations = append(explanations, ExplanationDTO{
 				NodeID:      d.NodeID,
 				Action:      finalAction,
-				Explanation: explanation,
+				Explanation: explanationResp.Explanation,
+				Grounded:    explanationResp.Grounded,
+				Sources:     explanationResp.Sources,
 			})
 		}
 
@@ -280,36 +270,12 @@ func Run(req RunRequest) (*PipelineResult, error) {
 	)
 
 	gitopsStatus := GitOpsDTO{
-		Status:  "skipped",
-		Message: "GitOps disabled or credentials missing",
+		Status:  "pending_approval",
+		Message: fmt.Sprintf("%d validated remediation(s) are awaiting human approval before PR creation", len(decisionsGitops)),
 		PRs:     []GitOpsPRDTO{},
 	}
 
-	if pluginpkg.GitOps != nil {
-		prs, err := pluginpkg.GitOps.Run(g, decisionsGitops, nodeRisks)
-		if err != nil {
-			gitopsStatus.Status = "skipped"
-			gitopsStatus.Message = err.Error()
-		} else {
-			gitopsStatus.Status = "ready"
-			gitopsStatus.Message = "Pull requests generated"
-
-			for _, pr := range prs {
-				gitopsStatus.PRs = append(gitopsStatus.PRs, GitOpsPRDTO{
-					URL:      pr.URL,
-					Status:   pr.Status,
-					PRNumber: pr.PRNumber,
-					Branch:   pr.Branch,
-					NodeID:   pr.NodeID,
-					Action:   pr.Action,
-					Message:  pr.Message,
-				})
-			}
-		}
-	}
-
-	stages = append(stages, PipelineStageDTO{Name: "GitOps", Status: gitopsStatus.Status})
-
+	stages = append(stages, PipelineStageDTO{Name: "GitOps", Status: "pending_approval"})
 	records := feedback.Load()
 	for _, a := range approvedActions {
 		record := feedback.CreateRecord(

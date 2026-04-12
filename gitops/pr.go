@@ -16,13 +16,28 @@ var githubHTTPClient = &http.Client{
 	Timeout: 12 * time.Second,
 }
 
-func CreatePR(code InfraCode, d Decision, currentGraph *Graph) PRResponse {
+func CreatePR(code InfraCode, d Decision, diff Diff) PRResponse {
+	if err := ValidatePRRequest(diff, code, d); err != nil {
+		log.Println(err.Error())
+		return PRResponse{
+			Status:  "BLOCKED",
+			NodeID:  d.NodeID,
+			Action:  d.FinalAction,
+			Message: err.Error(),
+		}
+	}
+
 	token := os.Getenv("GITHUB_TOKEN")
 	repo := os.Getenv("GITHUB_REPO")
 
 	if token == "" || repo == "" {
 		log.Println("Missing GITHUB_TOKEN or GITHUB_REPO")
-		return PRResponse{Status: "FAILED"}
+		return PRResponse{
+			Status:  "FAILED",
+			NodeID:  d.NodeID,
+			Action:  d.FinalAction,
+			Message: "Missing GITHUB_TOKEN or GITHUB_REPO",
+		}
 	}
 
 	if code.Content == "" {
@@ -34,12 +49,22 @@ func CreatePR(code InfraCode, d Decision, currentGraph *Graph) PRResponse {
 	baseSHA, err := getMainBranchSHA(repo, token)
 	if err != nil || baseSHA == "" {
 		log.Println("Failed to fetch main branch SHA:", err)
-		return PRResponse{Status: "FAILED"}
+		return PRResponse{
+			Status:  "FAILED",
+			NodeID:  d.NodeID,
+			Action:  d.FinalAction,
+			Message: "Failed to fetch main branch SHA",
+		}
 	}
 
 	if err := createBranch(repo, token, branch, baseSHA); err != nil {
 		log.Println("Branch creation failed:", err)
-		return PRResponse{Status: "FAILED"}
+		return PRResponse{
+			Status:  "FAILED",
+			NodeID:  d.NodeID,
+			Action:  d.FinalAction,
+			Message: err.Error(),
+		}
 	}
 
 	filePath := "infra/" + d.NodeID + ".tf"
@@ -47,11 +72,15 @@ func CreatePR(code InfraCode, d Decision, currentGraph *Graph) PRResponse {
 	fileSHA, err := getExistingFileSHA(repo, token, filePath, branch)
 	if err != nil {
 		log.Println("File lookup failed:", err)
-		return PRResponse{Status: "FAILED"}
+		return PRResponse{
+			Status:  "FAILED",
+			NodeID:  d.NodeID,
+			Action:  d.FinalAction,
+			Message: err.Error(),
+		}
 	}
 
-	fileContent := fmt.Sprintf(`
-# Terraform Infra
+	fileContent := fmt.Sprintf(`# Terraform Infra
 # Node: %s
 # Time: %d
 
@@ -72,13 +101,23 @@ func CreatePR(code InfraCode, d Decision, currentGraph *Graph) PRResponse {
 
 	if err := putFile(repo, token, filePath, filePayload); err != nil {
 		log.Println("File commit failed:", err)
-		return PRResponse{Status: "FAILED"}
+		return PRResponse{
+			Status:  "FAILED",
+			NodeID:  d.NodeID,
+			Action:  d.FinalAction,
+			Message: err.Error(),
+		}
 	}
 
 	prNumber, prURL, err := createPullRequest(repo, token, d, branch)
 	if err != nil {
 		log.Println("PR creation failed:", err)
-		return PRResponse{Status: "FAILED"}
+		return PRResponse{
+			Status:  "FAILED",
+			NodeID:  d.NodeID,
+			Action:  d.FinalAction,
+			Message: err.Error(),
+		}
 	}
 
 	log.Printf("[GitOps] PR created for Node=%s | PR #%d", d.NodeID, prNumber)
@@ -88,6 +127,9 @@ func CreatePR(code InfraCode, d Decision, currentGraph *Graph) PRResponse {
 		Status:   "CREATED",
 		PRNumber: prNumber,
 		Branch:   branch,
+		NodeID:   d.NodeID,
+		Action:   d.FinalAction,
+		Message:  "PR created after validation and explicit approval",
 	}
 }
 

@@ -10,6 +10,14 @@ import (
 func complianceScoreFromGraph(g *graph.Graph, risks map[string]float64) float64 {
 	score := 100.0
 
+	negativeFlags := map[string]bool{
+		"ADMIN_ACCESS":       true,
+		"IAM_OVERPRIVILEGED": true,
+		"OPEN_PORT":          true,
+		"PORT_0_0_0_0":       true,
+		"PUBLIC_BUCKET":      true,
+	}
+
 	for _, n := range g.Nodes {
 		if n.Exposure == "PUBLIC" {
 			score -= 7
@@ -17,7 +25,15 @@ func complianceScoreFromGraph(g *graph.Graph, risks map[string]float64) float64 
 		if n.Type == "DATABASE" || n.Type == "IAM_ROLE" {
 			score -= 4
 		}
-		score -= float64(len(n.Compliance)) * 1.4
+
+		negativeCount := 0
+		for _, flag := range n.Compliance {
+			if negativeFlags[flag] {
+				negativeCount++
+			}
+		}
+		score -= float64(negativeCount) * 1.4
+
 		if risks[n.ID] >= 8 {
 			score -= 3.5
 		}

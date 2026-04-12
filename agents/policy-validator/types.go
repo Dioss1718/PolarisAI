@@ -14,13 +14,14 @@ type ValidatedDecision struct {
 	FinalAction string
 	Score       float64
 	Reason      string
+	Scores      ValidationScores
 }
 
 type Policy struct {
-	MaxDowntime        float64
-	NoTerminateProd    bool
-	NoPublicDB         bool
-	EncryptionRequired bool
+	MaxDowntime        float64 `json:"max_downtime"`
+	NoTerminateProd    bool    `json:"no_terminate_prod"`
+	NoPublicDB         bool    `json:"no_public_db"`
+	EncryptionRequired bool    `json:"encryption_required"`
 }
 
 type ValidationScores struct {

@@ -1,58 +1,64 @@
 import { useMemo, useState } from "react";
+import { askCopilot } from "../api/client";
 
 export default function CopilotDrawer({ open, onClose, state, onSelectNode }) {
   const [query, setQuery] = useState("");
-  const [submittedQuery, setSubmittedQuery] = useState("");
+  const [answer, setAnswer] = useState(
+    "Ask about risk, bill shock, approved actions, attack paths, or a specific node."
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const answer = useMemo(() => {
-    const q = submittedQuery.trim().toLowerCase();
-    if (!q) return "Ask about risk, bill shock, approved actions, attack paths, or a specific node.";
+  const normalizedNodes = useMemo(() => state?.nodes || [], [state?.nodes]);
 
-    if (q.includes("bill shock")) {
-      const shocked = (state.forecasts || []).filter((f) => f.billShock).map((f) => f.nodeId);
-      return shocked.length ? `Bill shock risk detected on: ${shocked.join(", ")}` : "No bill shock risk detected.";
-    }
+  const trySelectMatchedNode = (rawQuery) => {
+    const q = String(rawQuery || "").trim().toLowerCase();
+    if (!q) return;
 
-    if (q.includes("approved")) {
-      const approved = (state.recommendations || [])
-        .filter((r) => r.status === "APPROVED" || r.status === "MODIFIED")
-        .map((r) => `${r.nodeId}: ${r.finalAction}`);
-      return approved.length ? approved.join(" | ") : "No approved actions found.";
-    }
-
-    if (q.includes("attack path")) {
-      return state.attackPaths?.length
-        ? `Detected ${state.attackPaths.length} attack path(s). Select one in the attack path panel for graph highlighting.`
-        : "No attack paths are currently present in the loaded state.";
-    }
-
-    const matchedNode = (state.nodes || []).find(
+    const matchedNode = normalizedNodes.find(
       (n) =>
-        q.includes(String(n.id).toLowerCase()) ||
-        q.includes(String(n.label).toLowerCase())
+        q.includes(String(n.id || "").toLowerCase()) ||
+        q.includes(String(n.label || "").toLowerCase())
     );
 
     if (matchedNode) {
       onSelectNode?.(matchedNode.id);
-      const rec = (state.recommendations || []).find((r) => r.nodeId === matchedNode.id);
-      return rec
-        ? `${matchedNode.id} is ${matchedNode.environment} ${matchedNode.type} on ${matchedNode.cloud}. Risk=${matchedNode.risk}. Final action=${rec.finalAction}.`
-        : `${matchedNode.id} selected. No final recommendation available.`;
     }
+  };
 
-    if (q.includes("risk")) {
-      const sorted = [...(state.nodes || [])].sort((a, b) => b.risk - a.risk).slice(0, 3);
-      return sorted.length
-        ? `Top risky resources: ${sorted.map((n) => `${n.id} (${n.risk})`).join(", ")}`
-        : "No node risk data is currently loaded.";
+  const handleSubmit = async () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      trySelectMatchedNode(trimmed);
+
+      const data = await askCopilot({
+        query: trimmed,
+        scenario: state?.scenario || "FULL_CHAOS",
+        seed: state?.seed || 42,
+      });
+
+      setAnswer(
+        data?.answer ||
+          "Copilot could not generate a response from the current pipeline state."
+      );
+    } catch (err) {
+      const backendError =
+        err?.response?.data?.error ||
+        err?.message ||
+        "Copilot request failed";
+
+      setError(backendError);
+      setAnswer(
+        "Copilot is unavailable right now. Please verify the backend and AI engine are running."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    return "Try: bill shock, attack paths, approved actions, top risk nodes, why aws_vm1.";
-  }, [submittedQuery, state, onSelectNode]);
-
-  const handleSubmit = () => {
-    if (!query.trim()) return;
-    setSubmittedQuery(query);
   };
 
   return (
@@ -64,9 +70,14 @@ export default function CopilotDrawer({ open, onClose, state, onSelectNode }) {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-lg font-semibold">Copilot</div>
-          <div className="text-sm text-slate-400">Grounded on current pipeline state.</div>
+          <div className="text-sm text-slate-400">
+            Backed by the AI engine and grounded on the current pipeline state.
+          </div>
         </div>
-        <button onClick={onClose} className="rounded-lg border border-white/10 px-3 py-1 text-sm">
+        <button
+          onClick={onClose}
+          className="rounded-lg border border-white/10 px-3 py-1 text-sm"
+        >
           Close
         </button>
       </div>
@@ -76,22 +87,30 @@ export default function CopilotDrawer({ open, onClose, state, onSelectNode }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSubmit();
+            if (e.key === "Enter" && !loading) {
+              handleSubmit();
+            }
           }}
           placeholder="Ask about risk, bill shock, approved actions..."
           className="flex-1 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 outline-none"
         />
         <button
           onClick={handleSubmit}
-          disabled={!query.trim()}
+          disabled={!query.trim() || loading}
           className="rounded-xl bg-sky-500 px-4 py-3 font-medium text-slate-950 disabled:opacity-50"
         >
-          Send
+          {loading ? "..." : "Send"}
         </button>
       </div>
 
+      {error ? (
+        <div className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+          {error}
+        </div>
+      ) : null}
+
       <div className="mt-4 rounded-xl bg-slate-900 p-4 text-sm whitespace-pre-wrap text-slate-200">
-        {answer}
+        {loading ? "Copilot is reasoning over the current governance state..." : answer}
       </div>
     </div>
   );

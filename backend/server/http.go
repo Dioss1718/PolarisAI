@@ -130,7 +130,8 @@ func Start(addr string) error {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, filterPipelineForRole(result, session.Role))
+		overlay := runtimeState.overlayGitOps(result, scenario, seed)
+		writeJSON(w, http.StatusOK, filterPipelineForRole(overlay, session.Role))
 	}))
 
 	mux.HandleFunc("/api/run", requireAuth(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
@@ -172,9 +173,32 @@ func Start(addr string) error {
 		}
 
 		runtimeState.setLatest(result, scenario, seed)
+		runtimeState.seedApprovalsFromPipeline(result, scenario, seed)
 
-		writeJSON(w, http.StatusOK, filterPipelineForRole(result, session.Role))
+		overlay := runtimeState.overlayGitOps(result, scenario, seed)
+		writeJSON(w, http.StatusOK, filterPipelineForRole(overlay, session.Role))
 	}))
+
+	mux.HandleFunc("/api/copilot", requireAuth(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
+		handleCopilot(w, r, session)
+	}))
+
+	mux.HandleFunc("/api/gitops/approve", requireAuth(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
+		handleGitOpsApprove(w, r, session)
+	}))
+
+	mux.HandleFunc("/api/gitops/reject", requireAuth(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
+		handleGitOpsReject(w, r, session)
+	}))
+
+	mux.HandleFunc("/api/gitops/audit", requireAuth(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
+		handleGitOpsAudit(w, r, session)
+	}))
+
+	mux.HandleFunc("/api/gitops/refresh-pr", requireAuth(func(w http.ResponseWriter, r *http.Request, session auth.Session) {
+		handleGitOpsRefreshPR(w, r, session)
+	}))
+
 	return http.ListenAndServe(addr, mux)
 }
 
